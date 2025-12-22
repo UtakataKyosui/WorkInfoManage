@@ -17,38 +17,23 @@ pub fn render_calendar(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Title
-            Constraint::Min(10),    // Calendar
+            Constraint::Min(10),    // Calendar (takes most space)
             Constraint::Length(3),  // Help
         ])
         .split(f.area());
 
-    // Title with better styling
-    let title = Paragraph::new(format!(
-        "📅 {} {}",
-        get_month_name(state.current_month.month()),
-        state.current_month.year()
-    ))
-    .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-    .alignment(Alignment::Center)
-    .block(Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::Cyan)));
-    f.render_widget(title, chunks[0]);
+    // Calendar grid with improved design - title will be in the calendar block
+    render_calendar_grid(f, chunks[0], state);
 
-    // Calendar grid with improved design
-    render_calendar_grid(f, chunks[1], state);
-
-    // Help text with icons
+    // Help text with icons - brighter color for visibility
     let help = Paragraph::new("◄ ►: Month | ▲ ▼: Week | ⏎: Edit | ⇧⇥: Tasks | ESC: Menu")
-        .style(Style::default().fg(Color::DarkGray))
+        .style(Style::default().fg(Color::Gray))
         .alignment(Alignment::Center)
         .block(Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::DarkGray)));
-    f.render_widget(help, chunks[2]);
+            .border_style(Style::default().fg(Color::Gray)));
+    f.render_widget(help, chunks[1]);
 }
 
 fn render_calendar_grid(f: &mut Frame, area: Rect, state: &CalendarState) {
@@ -75,15 +60,22 @@ fn render_calendar_grid(f: &mut Frame, area: Rect, state: &CalendarState) {
         event_store.add(today_time_date, Style::default().fg(Color::Green).add_modifier(Modifier::BOLD));
     }
 
+    // Create title with month and year
+    let title = format!(
+        "📅 Calendar - {} {}",
+        get_month_name(state.current_month.month()),
+        state.current_month.year()
+    );
+
     // Create the calendar widget with padding for better spacing
     let calendar = Monthly::new(current_date, event_store)
         .block(Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .title("Calendar")
+            .title(title)
             .title_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
             .border_style(Style::default().fg(Color::Cyan))
-            .padding(Padding::new(2, 2, 1, 1)))  // left, right, top, bottom padding
+            .padding(Padding::new(3, 3, 2, 2)))  // left, right, top, bottom padding - increased for larger size
         .show_month_header(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .show_weekdays_header(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
         .show_surrounding(Style::default().fg(Color::DarkGray));  // Show surrounding month days
