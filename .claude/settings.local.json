@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh api:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo test:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(git push:*)",
+      "Bash(git restore:*)",
+      "Bash(find:*)",
+      "Bash(git checkout:*)",
+      "Bash(git init:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

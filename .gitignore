@@ -1,0 +1,9 @@
+/target
+.env
+.env.*
+!.env.example
+logs/
+*.log
+data/
+config.toml
+mcp_config.json

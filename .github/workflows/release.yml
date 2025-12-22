@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/release/TaskManager
+          name: Release ${{ github.ref_name }}
+          body: |
+            Release ${{ github.ref_name }} of TaskManager.
+            
+            ## Changes
+            - Automated release via GitHub Actions.
+          draft: false
+          prerelease: false

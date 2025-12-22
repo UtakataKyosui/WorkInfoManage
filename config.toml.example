@@ -1,0 +1,29 @@
+# TaskManager Configuration
+
+[storage]
+# Storage type: "json" or "database"
+type = "json"
+
+# JSON storage configuration (when type = "json")
+<<<<<<< HEAD
+# Path is fixed to ~/task-manage/data.json
+# No additional configuration needed
+
+# Database storage configuration (when type = "database")
+# Uncomment and configure the following to use database storage:
+# [storage]
+# type = "database"
+# url = "${DATABASE_URL}"
+=======
+# If `path` is not specified, it defaults to `~/task-manage/data.json`
+# Supports environment variables and tilde (~) expansion
+# path = "/custom/path/to/data.json"
+# path = "${HOME}/custom-path/tasks.json"
+
+# Database storage configuration (when type = "database")
+# Uncomment and configure the following to use PostgreSQL database storage:
+# [storage]
+# type = "database"
+# url = "${DATABASE_URL}"  # Supports environment variable expansion
+# Example: url = "postgresql://user:password@localhost:5432/taskmanager"
+>>>>>>> aa5b5179cda0a69e44c2827b51ffadd30dc12905
