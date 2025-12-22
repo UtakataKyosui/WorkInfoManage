@@ -105,36 +105,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Create app state with storage
     let mut app = App::new(storage.clone(), report_storage);
-    app.load_tasks().await;
-
-    // Auto-sync on startup (if Asana/GitHub configured)
-    app.status_message = "Syncing...".to_string();
-    match synchronizer.sync().await {
-        Ok(fetched_tasks) => {
-            let count = fetched_tasks.len();
-            // Save tasks to storage
-            if let Err(e) = storage.save_tasks(&fetched_tasks).await {
-                eprintln!("Warning: Failed to save synced tasks: {}", e);
-            }
-            app.tasks = fetched_tasks;
-            app.ensure_selection_visible();
-
-            // Update Sync State
-            app.sync_state.last_sync_time = Some(chrono::Local::now());
-            app.sync_state.total_tasks = count;
-            app.sync_state.persisted_tasks = count;
-            app.sync_state.error = None;
-            
-            app.status_message = format!("Loaded {} tasks. Press 's' to refresh.", count);
-        }
-        Err(e) => {
-            app.sync_state.error = Some(e.to_string());
-            app.status_message = format!("Initial sync failed: {}. Press 's' to retry.", e);
-        }
-    }
 
     // Run app loop
-    let res = run_app(&mut terminal, &mut app, &synchronizer).await;
+    let res = run_app(&mut terminal, &mut app, &synchronizer, storage.clone()).await;
 
     // Cleanup terminal - ensure this always happens
     // Clear the terminal before leaving alternate screen
@@ -175,7 +148,7 @@ async fn save_current_memo(app: &mut App) {
     }
 }
 
-async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, synchronizer: &TaskSynchronizer) -> io::Result<()> {
+async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, synchronizer: &TaskSynchronizer, storage: Arc<dyn work_info_manage::storage::Storage>) -> io::Result<()> {
     // Pomodoro timer configuration (15 minutes)
     const POMODORO_SECONDS: i64 = 15 * 60;
     
@@ -230,15 +203,76 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                         work_info_manage::app::CurrentScreen::Menu => {
                             match key.code {
                                 KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
+                                KeyCode::Up | KeyCode::Char('k') => {
+                                    if app.menu_selection > 0 {
+                                        app.menu_selection -= 1;
+                                    }
+                                }
+                                KeyCode::Down | KeyCode::Char('j') => {
+                                    if app.menu_selection < 2 {
+                                        app.menu_selection += 1;
+                                    }
+                                }
+                                KeyCode::Enter => {
+                                    match app.menu_selection {
+                                        0 => {
+                                            // Task Manager selected - load tasks if not already loaded
+                                            if !app.tasks_loaded {
+                                                app.status_message = "Loading tasks...".to_string();
+                                                terminal.draw(|f| ui(f, app))?;
+
+                                                app.load_tasks().await;
+
+                                                // Auto-sync if configured
+                                                app.status_message = "Syncing...".to_string();
+                                                terminal.draw(|f| ui(f, app))?;
+
+                                                match synchronizer.sync().await {
+                                                    Ok(fetched_tasks) => {
+                                                        let count = fetched_tasks.len();
+                                                        if let Err(e) = storage.save_tasks(&fetched_tasks).await {
+                                                            eprintln!("Warning: Failed to save synced tasks: {}", e);
+                                                        }
+                                                        app.tasks = fetched_tasks;
+                                                        app.ensure_selection_visible();
+
+                                                        app.sync_state.last_sync_time = Some(chrono::Local::now());
+                                                        app.sync_state.total_tasks = count;
+                                                        app.sync_state.persisted_tasks = count;
+                                                        app.sync_state.error = None;
+
+                                                        app.status_message = format!("Loaded {} tasks. Press 's' to refresh.", count);
+                                                    }
+                                                    Err(e) => {
+                                                        app.sync_state.error = Some(e.to_string());
+                                                        app.status_message = format!("Sync failed: {}. Press 's' to retry.", e);
+                                                    }
+                                                }
+
+                                                app.tasks_loaded = true;
+                                            }
+                                            app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
+                                        }
+                                        1 => {
+                                            // Calendar & Daily Reports
+                                            app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
+                                            app.calendar_state = Some(work_info_manage::app::CalendarState::new());
+                                        }
+                                        2 => {
+                                            // Markdown Memos
+                                            app.current_screen = work_info_manage::app::CurrentScreen::MemoList;
+                                        }
+                                        _ => {}
+                                    }
+                                }
                                 KeyCode::Char('1') => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
+                                    app.menu_selection = 0;
                                 }
                                 KeyCode::Char('2') => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
-                                    app.calendar_state = Some(work_info_manage::app::CalendarState::new());
+                                    app.menu_selection = 1;
                                 }
                                 KeyCode::Char('3') => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::MemoList;
+                                    app.menu_selection = 2;
                                 }
                                 _ => {}
                             }

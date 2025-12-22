@@ -2,7 +2,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap, Table, Row, Cell, Tabs},
+    widgets::{Block, Borders, Paragraph, Wrap, Table, Row, Cell, Tabs, List, ListItem},
     Frame,
 };
 use crate::app::{App, CurrentScreen};
@@ -32,13 +32,13 @@ pub fn ui(f: &mut Frame, app: &mut App) {
     }
 }
 
-fn render_menu(f: &mut Frame, _app: &mut App) {
+fn render_menu(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(4)
+        .margin(2)
         .constraints([
-            Constraint::Length(5),   // Title
-            Constraint::Min(10),     // Menu items
+            Constraint::Length(3),   // Title
+            Constraint::Min(0),      // Menu items
             Constraint::Length(3),   // Help
         ])
         .split(f.area());
@@ -47,44 +47,48 @@ fn render_menu(f: &mut Frame, _app: &mut App) {
     let title = Paragraph::new(vec![
         Line::from(vec![
             Span::styled("WorkInfoManage", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::raw(" - Select a feature to start"),
         ]),
-        Line::from(""),
-        Line::from("Unified task management, daily reports, and markdown memos"),
     ])
     .alignment(Alignment::Center)
     .block(Block::default().borders(Borders::ALL));
     f.render_widget(title, chunks[0]);
 
-    // Menu items
-    let menu_items = vec![
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("1", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::raw(" - Task Manager (Dashboard)"),
+    // Menu items using List widget
+    let items = vec![
+        ListItem::new(vec![
+            Line::from(vec![
+                Span::styled("Task Manager", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            ]),
+            Line::from("  Manage tasks with Asana/GitHub sync, Pomodoro timer, and work logs"),
         ]),
-        Line::from("    Manage tasks with Asana/GitHub sync, Pomodoro timer"),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("2", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::raw(" - Calendar & Daily Reports"),
+        ListItem::new(vec![
+            Line::from(vec![
+                Span::styled("Calendar & Daily Reports", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            ]),
+            Line::from("  View calendar and edit daily reports with markdown support"),
         ]),
-        Line::from("    View calendar and edit daily reports"),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("3", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            Span::raw(" - Markdown Memos"),
+        ListItem::new(vec![
+            Line::from(vec![
+                Span::styled("Markdown Memos", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            ]),
+            Line::from("  Create and organize markdown notes with tree view and search"),
         ]),
-        Line::from("    Create and organize markdown notes with tree view"),
-        Line::from(""),
     ];
 
-    let menu = Paragraph::new(menu_items)
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL).title("Select a feature"));
-    f.render_widget(menu, chunks[1]);
+    let list = List::new(items)
+        .block(Block::default().borders(Borders::ALL).title("Features"))
+        .highlight_style(
+            Style::default()
+                .bg(Color::Blue)
+                .add_modifier(Modifier::BOLD)
+        )
+        .highlight_symbol(">> ");
+
+    f.render_stateful_widget(list, chunks[1], &mut ratatui::widgets::ListState::default().with_selected(Some(app.menu_selection)));
 
     // Help
-    let help = Paragraph::new("Press 1, 2, or 3 to select | q: Quit")
+    let help = Paragraph::new("↑↓/j/k: Navigate | Enter: Select | q: Quit")
         .style(Style::default().fg(Color::Gray))
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));

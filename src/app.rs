@@ -179,6 +179,8 @@ pub struct App {
     pub editor_state: Option<EditorState>,
     pub preview_state: Option<PreviewState>,
     pub memo_state: MemoState,
+    pub menu_selection: usize,
+    pub tasks_loaded: bool,
 }
 
 impl App {
@@ -210,6 +212,8 @@ impl App {
             editor_state: None,
             preview_state: None,
             memo_state: MemoState::new(),
+            menu_selection: 0,
+            tasks_loaded: false,
         }
     }
 
