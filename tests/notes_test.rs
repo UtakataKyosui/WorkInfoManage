@@ -1,5 +1,5 @@
 use sea_orm::{MockDatabase, Transaction, DbErr, EntityTrait, ActiveModelTrait, Set, PaginatorTrait, QueryFilter, ColumnTrait};
-use TaskManager::db::task_notes;
+use work_info_manage::db::task_notes;
 use chrono::Utc;
 
 #[tokio::test]

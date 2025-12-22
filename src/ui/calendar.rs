@@ -1,10 +1,11 @@
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph, Table, Row, Cell},
+    widgets::{Block, Borders, Paragraph, BorderType, calendar::{Monthly, CalendarEventStore}},
     Frame,
 };
-use chrono::{Datelike, NaiveDate, Months};
+use chrono::{Datelike, NaiveDate};
+use time::{Date, Month as TimeMonth};
 use crate::app::{App, CalendarState};
 
 pub fn render_calendar(f: &mut Frame, app: &mut App) {
@@ -22,106 +23,91 @@ pub fn render_calendar(f: &mut Frame, app: &mut App) {
         ])
         .split(f.area());
 
-    // Title
+    // Title with better styling
     let title = Paragraph::new(format!(
-        "Calendar - {} {}",
+        "📅 {} {}",
         get_month_name(state.current_month.month()),
         state.current_month.year()
     ))
     .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
     .alignment(Alignment::Center)
-    .block(Block::default().borders(Borders::ALL));
+    .block(Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Cyan)));
     f.render_widget(title, chunks[0]);
 
-    // Calendar grid
+    // Calendar grid with improved design
     render_calendar_grid(f, chunks[1], state);
 
-    // Help text
-    let help = Paragraph::new("← →: Change month | ↑↓: Move week | Enter: Edit report | Shift+Tab: Back to tasks | Esc: Menu")
-        .style(Style::default().fg(Color::Gray))
+    // Help text with icons
+    let help = Paragraph::new("◄ ►: Month | ▲ ▼: Week | ⏎: Edit | ⇧⇥: Tasks | ESC: Menu")
+        .style(Style::default().fg(Color::DarkGray))
         .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL));
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::DarkGray)));
     f.render_widget(help, chunks[2]);
 }
 
 fn render_calendar_grid(f: &mut Frame, area: Rect, state: &CalendarState) {
-    let first_day = NaiveDate::from_ymd_opt(
-        state.current_month.year(),
-        state.current_month.month(),
-        1
-    ).unwrap();
-    
-    let days_in_month = get_days_in_month(state.current_month.year(), state.current_month.month());
-    let first_weekday = first_day.weekday().num_days_from_monday() as usize;
+    // Convert chrono NaiveDate to time::Date
+    let current_date = chrono_to_time_date(state.current_month);
 
-    // Header row
-    let header = Row::new(vec![
-        Cell::from("Mon").style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Cell::from("Tue").style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Cell::from("Wed").style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Cell::from("Thu").style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Cell::from("Fri").style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Cell::from("Sat").style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Cell::from("Sun").style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-    ]).height(1);
+    // Create event store for marking dates
+    let mut event_store = CalendarEventStore::default();
 
-    // Calendar rows
-    let mut rows = vec![header];
-    let mut week = vec![Cell::from(""); 7];
-    let mut day_index = 0;
-
-    for day in 1..=days_in_month {
-        let date = NaiveDate::from_ymd_opt(
-            state.current_month.year(),
-            state.current_month.month(),
-            day
-        ).unwrap();
-
-        let col = (first_weekday + day_index) % 7;
-        
-        let mut style = Style::default();
-        
-        // Highlight selected date
-        if date == state.selected_date {
-            style = style.bg(Color::Blue).fg(Color::White).add_modifier(Modifier::BOLD);
-        }
-        // Highlight today
-        else if date == chrono::Local::now().naive_local().date() {
-            style = style.fg(Color::Green).add_modifier(Modifier::BOLD);
-        }
-        // Highlight dates with reports
-        else if state.report_dates.contains(&date) {
-            style = style.fg(Color::Cyan);
-        }
-
-        week[col] = Cell::from(format!("{:2}", day)).style(style);
-
-        if col == 6 {
-            rows.push(Row::new(week.clone()).height(1));
-            week = vec![Cell::from(""); 7];
-        }
-        
-        day_index += 1;
+    // Add report dates to the event store
+    for report_date in &state.report_dates {
+        let time_date = chrono_to_time_date(*report_date);
+        event_store.add(time_date, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
     }
 
-    // Add last incomplete week if needed
-    if day_index % 7 != 0 {
-        rows.push(Row::new(week).height(1));
+    // Highlight selected date
+    let selected_time_date = chrono_to_time_date(state.selected_date);
+    event_store.add(selected_time_date, Style::default().bg(Color::Blue).fg(Color::White).add_modifier(Modifier::BOLD));
+
+    // Highlight today
+    let today = chrono::Local::now().naive_local().date();
+    let today_time_date = chrono_to_time_date(today);
+    if !state.report_dates.contains(&today) && today != state.selected_date {
+        event_store.add(today_time_date, Style::default().fg(Color::Green).add_modifier(Modifier::BOLD));
     }
 
-    let widths = [Constraint::Percentage(14); 7];
-    let table = Table::new(rows, widths)
-        .block(Block::default().borders(Borders::ALL).title("Calendar"))
-        .column_spacing(1);
+    // Create the calendar widget
+    let calendar = Monthly::new(current_date, event_store)
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .title("Calendar")
+            .title_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+            .border_style(Style::default().fg(Color::Cyan)))
+        .show_month_header(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+        .show_weekdays_header(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
 
-    f.render_widget(table, area);
+    f.render_widget(calendar, area);
 }
 
-fn get_days_in_month(year: i32, month: u32) -> u32 {
-    // Get the first day of the month, add one month, then subtract one day
-    let first_day = NaiveDate::from_ymd_opt(year, month, 1).expect("Invalid year or month");
-    let next_month_first = first_day.checked_add_months(Months::new(1)).expect("Could not determine next month");
-    next_month_first.pred_opt().expect("Could not determine previous day").day()
+fn chrono_to_time_date(date: NaiveDate) -> Date {
+    let month = match date.month() {
+        1 => TimeMonth::January,
+        2 => TimeMonth::February,
+        3 => TimeMonth::March,
+        4 => TimeMonth::April,
+        5 => TimeMonth::May,
+        6 => TimeMonth::June,
+        7 => TimeMonth::July,
+        8 => TimeMonth::August,
+        9 => TimeMonth::September,
+        10 => TimeMonth::October,
+        11 => TimeMonth::November,
+        12 => TimeMonth::December,
+        _ => unreachable!(),
+    };
+
+    Date::from_calendar_date(date.year(), month, date.day() as u8)
+        .expect("Invalid date conversion")
 }
 
 fn get_month_name(month: u32) -> &'static str {

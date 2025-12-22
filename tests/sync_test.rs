@@ -1,4 +1,4 @@
-use TaskManager::logic::sync::TaskSynchronizer;
+use work_info_manage::logic::sync::TaskSynchronizer;
 use serde_json::json;
 use dotenvy;
 use std::fs::File;
