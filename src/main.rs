@@ -3,6 +3,7 @@ use work_info_manage::ui::ui;
 use work_info_manage::logic::sync::TaskSynchronizer;
 use work_info_manage::config::Config;
 use work_info_manage::storage::create_storage;
+mod markdown_utils;
 
 use anyhow::Context;
 use std::{error::Error, io, sync::Arc};
@@ -11,6 +12,8 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use chrono::Datelike;
+
 use ratatui::{backend::{Backend, CrosstermBackend}, Terminal};
 
 #[tokio::main]
@@ -81,7 +84,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     
     // Setup Synchronizer
-    let synchronizer = TaskSynchronizer::new();
+    let synchronizer = Arc::new(TaskSynchronizer::new());
 
     // Setup terminal
     enable_raw_mode()?;
@@ -107,7 +110,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut app = App::new(storage.clone(), report_storage);
 
     // Run app loop
-    let res = run_app(&mut terminal, &mut app, &synchronizer, storage.clone()).await;
+    let res = run_app(&mut terminal, &mut app, synchronizer.clone(), storage.clone()).await;
 
     // Cleanup terminal - ensure this always happens
     // Clear the terminal before leaving alternate screen
@@ -130,19 +133,86 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 
-async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, synchronizer: &TaskSynchronizer, storage: Arc<dyn work_info_manage::storage::Storage>) -> io::Result<()> {
+async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, synchronizer: Arc<TaskSynchronizer>, storage: Arc<dyn work_info_manage::storage::Storage>) -> io::Result<()> {
     // Pomodoro timer configuration (15 minutes)
     const POMODORO_SECONDS: i64 = 15 * 60;
     
     loop {
         terminal.draw(|f| ui(f, app))?;
+        
+        // Check for sync results
+        if let Some(ref rx) = app.sync_receiver {
+            if let Ok(result) = rx.try_recv() {
+                // Sync finished
+                app.sync_receiver = None;
+                
+                match result {
+                    Ok(fetched_tasks) => {
+                        let count = fetched_tasks.len();
+                        if let Err(e) = storage.save_tasks(&fetched_tasks).await {
+                             eprintln!("Warning: Failed to save synced tasks: {}", e);
+                        }
+                        app.tasks = fetched_tasks;
+                        app.ensure_selection_visible();
 
-        if event::poll(std::time::Duration::from_secs(1))? {
+                        app.sync_state.last_sync_time = Some(chrono::Local::now());
+                        app.sync_state.total_tasks = count;
+                        app.sync_state.persisted_tasks = count;
+                        app.sync_state.error = None;
+
+                        app.status_message = format!("Sync completed. {} tasks loaded.", count);
+                    }
+                    Err(e) => {
+                        app.sync_state.error = Some(e.clone());
+                        app.status_message = format!("Sync failed: {}. Press 's' to retry.", e);
+                    }
+                }
+            }
+        }
+
+        if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
+                // Global Cycle Navigation (Shift+Tab)
+                if key.code == KeyCode::BackTab {
+                    app.input_mode = false;
+                    app.task_note_textarea = None;
+                    
+                    match app.current_screen {
+                        work_info_manage::app::CurrentScreen::Menu => {
+                            app.build_unified_memo_list().await;
+                            app.current_screen = work_info_manage::app::CurrentScreen::UnifiedMemoList;
+                        }
+                        work_info_manage::app::CurrentScreen::UnifiedMemoList => {
+                            if app.calendar_state.is_none() {
+                                app.calendar_state = Some(work_info_manage::app::CalendarState::new());
+                            }
+                            app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
+                        }
+                        work_info_manage::app::CurrentScreen::Calendar |
+                        work_info_manage::app::CurrentScreen::ReportEditor |
+                        work_info_manage::app::CurrentScreen::ReportPreview => {
+                            if !app.tasks_loaded {
+                                app.load_tasks().await;
+                                app.trigger_sync(synchronizer.clone());
+                                app.tasks_loaded = true;
+                            }
+                            app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
+                        }
+                        _ => {
+                            // Dashboard, Detail, Timer, ReviewDetail -> Menu
+                            app.current_screen = work_info_manage::app::CurrentScreen::Menu;
+                        }
+                    }
+                    continue;
+                }
+
                 if app.input_mode {
                     if let Some(ref mut textarea) = app.task_note_textarea {
                         // TextArea mode - Markdown editing
                         match key.code {
+                            KeyCode::Enter => {
+                                crate::markdown_utils::handle_markdown_enter(textarea);
+                            }
                             KeyCode::Esc => {
                                 app.save_note().await;
                             }
@@ -191,16 +261,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                 } else {
                     // Global Keys
                      match key.code {
-                        KeyCode::BackTab => {
-                            // Shift+Tab to toggle calendar
-                            if app.current_screen == work_info_manage::app::CurrentScreen::Calendar {
-                                app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
-                                app.calendar_state = None;
-                            } else {
-                                app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
-                                app.calendar_state = Some(work_info_manage::app::CalendarState::new());
-                            }
-                        }
+
                         KeyCode::Char('t') => {
                             if app.timer.active_task_id.is_some() {
                                 app.stop_timer().await;
@@ -229,39 +290,13 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                 KeyCode::Enter => {
                                     match app.menu_selection {
                                         0 => {
-                                            // Task Manager selected - load tasks if not already loaded
+                                            // Task Manager selected - load tasks from storage immediately
                                             if !app.tasks_loaded {
-                                                app.status_message = "Loading tasks...".to_string();
-                                                terminal.draw(|f| ui(f, app))?;
-
                                                 app.load_tasks().await;
-
-                                                // Auto-sync if configured
-                                                app.status_message = "Syncing...".to_string();
-                                                terminal.draw(|f| ui(f, app))?;
-
-                                                match synchronizer.sync().await {
-                                                    Ok(fetched_tasks) => {
-                                                        let count = fetched_tasks.len();
-                                                        if let Err(e) = storage.save_tasks(&fetched_tasks).await {
-                                                            eprintln!("Warning: Failed to save synced tasks: {}", e);
-                                                        }
-                                                        app.tasks = fetched_tasks;
-                                                        app.ensure_selection_visible();
-
-                                                        app.sync_state.last_sync_time = Some(chrono::Local::now());
-                                                        app.sync_state.total_tasks = count;
-                                                        app.sync_state.persisted_tasks = count;
-                                                        app.sync_state.error = None;
-
-                                                        app.status_message = format!("Loaded {} tasks. Press 's' to refresh.", count);
-                                                    }
-                                                    Err(e) => {
-                                                        app.sync_state.error = Some(e.to_string());
-                                                        app.status_message = format!("Sync failed: {}. Press 's' to retry.", e);
-                                                    }
-                                                }
-
+                                                
+                                                // Trigger background sync
+                                                app.trigger_sync(synchronizer.clone());
+                                                
                                                 app.tasks_loaded = true;
                                             }
                                             app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
@@ -288,7 +323,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                 KeyCode::Char('3') => {
                                     app.menu_selection = 2;
                                 }
-                                _ => {}
+                               _ => {}
                             }
                         }
                         work_info_manage::app::CurrentScreen::Dashboard => {
@@ -298,60 +333,8 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                     app.current_screen = work_info_manage::app::CurrentScreen::Menu;
                                 }
                                 KeyCode::Char('s') => {
-                                    // Sync tasks
-                                    app.status_message = "Syncing...".to_string();
-                                    terminal.draw(|f| ui(f, app))?; // Redraw to show syncing message
-                                    
-                                    use std::io::Write;
-                                    if let Err(e) = std::fs::create_dir_all("logs") {
-                                        eprintln!("Warning: Failed to create logs directory: {}", e);
-                                    }
-                                    
-                                    
-                                    let mut log_file = match std::fs::OpenOptions::new()
-                                        .create(true)
-                                        .append(true)
-                                        .open("logs/sync.log")
-                                    {
-                                        Ok(file) => Some(file),
-                                        Err(e) => {
-                                            eprintln!("Warning: Failed to open log file: {}", e);
-                                            None
-                                        }
-                                    };
-                                    
-                                    if let Some(ref mut file) = log_file {
-                                        writeln!(file, "\n=== Sync started at {:?} ===", std::time::SystemTime::now()).ok();
-                                    }
-                                    
-                                    match synchronizer.sync().await {
-                                        Ok(fetched_tasks) => {
-                                            let count = fetched_tasks.len();
-                                            if let Some(ref mut file) = log_file {
-                                                writeln!(file, "Sync successful: {} tasks fetched", count).ok();
-                                                for task in &fetched_tasks {
-                                                    writeln!(file, "  - {}: {}", task.title, task.status).ok();
-                                                }
-                                            }
-                                            app.tasks = fetched_tasks;
-                                            app.ensure_selection_visible(); 
-                                            
-                                            // Update Sync State
-                                            app.sync_state.last_sync_time = Some(chrono::Local::now());
-                                            app.sync_state.total_tasks = count;
-                                            app.sync_state.persisted_tasks = count;
-                                            app.sync_state.error = None;
-                                            
-                                            app.status_message = format!("Sync completed. {} tasks loaded.", count);
-                                        }
-                                        Err(e) => {
-                                            if let Some(ref mut file) = log_file {
-                                                writeln!(file, "Sync error: {:?}", e).ok();
-                                            }
-                                            app.sync_state.error = Some(e.to_string());
-                                            app.status_message = format!("Sync failed: {}", e);
-                                        }
-                                    }
+                                    // Manual Sync trigger
+                                    app.trigger_sync(synchronizer.clone());
                                 }
                                 KeyCode::Down => {
                                     app.select_next_task();
@@ -360,7 +343,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                     app.select_prev_task();
                                 }
                                 KeyCode::Enter => {
-                                    if !app.tasks.is_empty() {
+                                    if !app.get_sorted_visible_indices().is_empty() {
                                         app.current_screen = work_info_manage::app::CurrentScreen::Detail;
                                     }
                                 }
@@ -429,7 +412,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                     app.current_screen = work_info_manage::app::CurrentScreen::Menu;
                                     app.calendar_state = None;
                                 }
-                                KeyCode::Left => {
+                                KeyCode::Char('[') => {
                                     if let Some(ref mut state) = app.calendar_state {
                                         // Previous month
                                         state.current_month = state.current_month
@@ -437,7 +420,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                             .unwrap_or(state.current_month);
                                     }
                                 }
-                                KeyCode::Right => {
+                                KeyCode::Char(']') => {
                                     if let Some(ref mut state) = app.calendar_state {
                                         // Next month
                                         state.current_month = state.current_month
@@ -445,20 +428,56 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                             .unwrap_or(state.current_month);
                                     }
                                 }
-                                KeyCode::Up => {
+                                KeyCode::Left | KeyCode::Char('h') => {
                                     if let Some(ref mut state) = app.calendar_state {
-                                        // Previous week (7 days)
+                                        // Previous day
+                                        state.selected_date = state.selected_date
+                                            .checked_sub_days(chrono::Days::new(1))
+                                            .unwrap_or(state.selected_date);
+                                        // Sync view if moved to prev month
+                                        let first_day = state.selected_date.with_day(1).unwrap();
+                                        if first_day != state.current_month {
+                                            state.current_month = first_day;
+                                        }
+                                    }
+                                }
+                                KeyCode::Right | KeyCode::Char('l') => {
+                                    if let Some(ref mut state) = app.calendar_state {
+                                        // Next day
+                                        state.selected_date = state.selected_date
+                                            .checked_add_days(chrono::Days::new(1))
+                                            .unwrap_or(state.selected_date);
+                                        // Sync view if moved to next month
+                                        let first_day = state.selected_date.with_day(1).unwrap();
+                                        if first_day != state.current_month {
+                                            state.current_month = first_day;
+                                        }
+                                    }
+                                }
+                                KeyCode::Up | KeyCode::Char('k') => {
+                                    if let Some(ref mut state) = app.calendar_state {
+                                        // Previous week
                                         state.selected_date = state.selected_date
                                             .checked_sub_days(chrono::Days::new(7))
                                             .unwrap_or(state.selected_date);
+                                        // Sync view
+                                        let first_day = state.selected_date.with_day(1).unwrap();
+                                        if first_day != state.current_month {
+                                            state.current_month = first_day;
+                                        }
                                     }
                                 }
-                                KeyCode::Down => {
+                                KeyCode::Down | KeyCode::Char('j') => {
                                     if let Some(ref mut state) = app.calendar_state {
-                                        // Next week (7 days)
+                                        // Next week
                                         state.selected_date = state.selected_date
                                             .checked_add_days(chrono::Days::new(7))
                                             .unwrap_or(state.selected_date);
+                                        // Sync view
+                                        let first_day = state.selected_date.with_day(1).unwrap();
+                                        if first_day != state.current_month {
+                                            state.current_month = first_day;
+                                        }
                                     }
                                 }
                                 KeyCode::Enter => {
@@ -485,18 +504,29 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                         work_info_manage::app::CurrentScreen::ReportEditor => {
                             if let Some(ref mut editor) = app.editor_state {
                                 match key.code {
-                                    KeyCode::Esc | KeyCode::Char('s') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                                        // Save report
+                                    KeyCode::Enter => {
+                                        crate::markdown_utils::handle_markdown_enter(&mut editor.textarea);
+                                    }
+                                    KeyCode::Esc => {
+                                        // Save and Exit
                                         let content = editor.textarea.lines().join("\n");
                                         let report = work_info_manage::report::DailyReport::new(editor.date, content);
                                         if let Err(e) = app.report_storage.save_report(&report).await {
                                             app.status_message = format!("Failed to save report: {}", e);
                                         } else {
                                             app.status_message = "Report saved.".to_string();
-                                            if key.code == KeyCode::Esc {
-                                                app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
-                                                app.editor_state = None;
-                                            }
+                                            app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
+                                            app.editor_state = None;
+                                        }
+                                    }
+                                    KeyCode::Char('s') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                                        // Save only
+                                        let content = editor.textarea.lines().join("\n");
+                                        let report = work_info_manage::report::DailyReport::new(editor.date, content);
+                                        if let Err(e) = app.report_storage.save_report(&report).await {
+                                            app.status_message = format!("Failed to save report: {}", e);
+                                        } else {
+                                            app.status_message = "Report saved.".to_string();
                                         }
                                     }
                                     KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
@@ -537,52 +567,74 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                             }
                         }
                         work_info_manage::app::CurrentScreen::UnifiedMemoList => {
-                            match key.code {
-                                KeyCode::Char('q') | KeyCode::Esc => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Menu;
-                                    app.unified_memo_list_state = None;
-                                }
-                                KeyCode::Down | KeyCode::Char('j') => {
-                                    if let Some(ref mut state) = app.unified_memo_list_state {
-                                        if state.selected_index < state.items.len().saturating_sub(1) {
-                                            state.selected_index += 1;
-                                        }
+                            if let Some(ref mut state) = app.unified_memo_list_state {
+                                match key.code {
+                                    KeyCode::Char('q') | KeyCode::Esc => {
+                                        app.current_screen = work_info_manage::app::CurrentScreen::Menu;
+                                        app.unified_memo_list_state = None;
                                     }
-                                }
-                                KeyCode::Up | KeyCode::Char('k') => {
-                                    if let Some(ref mut state) = app.unified_memo_list_state {
-                                        if state.selected_index > 0 {
-                                            state.selected_index -= 1;
-                                        }
+                                    KeyCode::Down | KeyCode::Char('j') => {
+                                        state.tree_state.key_down();
                                     }
-                                }
-                                KeyCode::Enter => {
-                                    if let Some(ref state) = app.unified_memo_list_state {
-                                        if let Some(item) = state.items.get(state.selected_index) {
-                                            match item {
-                                                work_info_manage::app::UnifiedMemoItem::DailyReport { date, .. } => {
-                                                    // Load and edit daily report
-                                                    let content = if let Ok(Some(report)) = app.report_storage.load_report(*date).await {
+                                    KeyCode::Up | KeyCode::Char('k') => {
+                                        state.tree_state.key_up();
+                                    }
+                                    KeyCode::Left | KeyCode::Char('h') => {
+                                        state.tree_state.key_left();
+                                    }
+                                    KeyCode::Right | KeyCode::Char('l') => {
+                                        state.tree_state.key_right();
+                                    }
+                                    KeyCode::Char(' ') => {
+                                        state.tree_state.toggle_selected();
+                                    }
+                                    KeyCode::Enter => {
+                                        let selected = state.tree_state.selected();
+                                        if !selected.is_empty() {
+                                            let last_segment = selected.last().unwrap();
+                                            
+                                            // Check ID type
+                                            if last_segment.starts_with("report-") {
+                                                // It's a daily report
+                                                // Format: report-YYYY-MM-DD
+                                                if let Ok(date) = chrono::NaiveDate::parse_from_str(last_segment.trim_start_matches("report-"), "%Y-%m-%d") {
+                                                     let content = if let Ok(Some(report)) = app.report_storage.load_report(date).await {
                                                         report.content
                                                     } else {
                                                         String::new()
                                                     };
 
-                                                    app.editor_state = Some(work_info_manage::app::EditorState::new(*date, content));
+                                                    app.editor_state = Some(work_info_manage::app::EditorState::new(date, content));
                                                     app.current_screen = work_info_manage::app::CurrentScreen::ReportEditor;
                                                 }
-                                                work_info_manage::app::UnifiedMemoItem::TaskNote { task_id, note_id, .. } => {
-                                                    // Find and navigate to the task
-                                                    if let Some(task_index) = app.tasks.iter().position(|t| t.id == *task_id) {
-                                                        app.selected_task_index = task_index;
+                                            } else if last_segment.starts_with("note-") {
+                                                // It's a task note
+                                                // Find the note to jump to task
+                                                if let Ok(note_id) = last_segment.trim_start_matches("note-").parse::<i32>() {
+                                                    // Find which task has this note
+                                                    let mut target_task_index = None;
+                                                    for (idx, task) in app.tasks.iter().enumerate() {
+                                                        if let Some(notes) = app.notes.get(&task.id) {
+                                                            if notes.iter().any(|n| n.id == note_id) {
+                                                                target_task_index = Some(idx);
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                    
+                                                    if let Some(idx) = target_task_index {
+                                                        app.selected_task_index = idx;
                                                         app.current_screen = work_info_manage::app::CurrentScreen::Detail;
                                                     }
                                                 }
+                                            } else {
+                                                // Group node (Year/Month/Day) - Toggle
+                                                state.tree_state.toggle_selected();
                                             }
                                         }
                                     }
+                                    _ => {}
                                 }
-                                _ => {}
                             }
                         }
                     }

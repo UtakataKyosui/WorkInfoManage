@@ -1,21 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(gh pr view:*)",
-      "Bash(gh pr checks:*)",
-      "Bash(gh api:*)",
-      "Bash(cargo build:*)",
-      "Bash(cargo test:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push)",
-      "Bash(git push:*)",
-      "Bash(git restore:*)",
-      "Bash(find:*)",
-      "Bash(git checkout:*)",
-      "Bash(git init:*)",
-      "Bash(gh repo create:*)",
-      "Bash(git remote add:*)"
+      "WebSearch",
+      "Bash(git reset:*)",
+      "WebFetch(domain:docs.rs)",
+      "Bash(◄►: Month)",
+      "Bash(▲▼: Week)",
+      "Bash(⏎: Edit)",
+      "Bash(⇧⇥: Tasks)",
+      "Bash(ESC: Menu\"\n- Removed unused imports (Layout, Constraint, etc.)\n\nThis gives the calendar widget the maximum possible rendering area,\nmaking it much larger and easier to read on the terminal.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []

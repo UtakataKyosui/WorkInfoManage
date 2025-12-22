@@ -110,9 +110,25 @@ pub enum UnifiedMemoItem {
     TaskNote { task_id: i32, task_title: String, note_id: i32, created_at: chrono::NaiveDateTime },
 }
 
+impl UnifiedMemoItem {
+    pub fn id(&self) -> String {
+        match self {
+            UnifiedMemoItem::DailyReport { date, .. } => format!("report-{}", date),
+            UnifiedMemoItem::TaskNote { note_id, .. } => format!("note-{}", note_id),
+        }
+    }
+
+    pub fn date(&self) -> NaiveDate {
+        match self {
+            UnifiedMemoItem::DailyReport { date, .. } => *date,
+            UnifiedMemoItem::TaskNote { created_at, .. } => created_at.date(),
+        }
+    }
+}
+
 pub struct UnifiedMemoListState {
     pub items: Vec<UnifiedMemoItem>,
-    pub selected_index: usize,
+    pub tree_state: TreeState<String>,
 }
 
 impl Default for MemoState {
@@ -194,6 +210,7 @@ pub struct App {
     pub unified_memo_list_state: Option<UnifiedMemoListState>,
     pub menu_selection: usize,
     pub tasks_loaded: bool,
+    pub sync_receiver: Option<std::sync::mpsc::Receiver<Result<Vec<crate::db::tasks::Model>, String>>>,
 }
 
 impl App {
@@ -229,7 +246,27 @@ impl App {
             unified_memo_list_state: None,
             menu_selection: 0,
             tasks_loaded: false,
+            sync_receiver: None,
         }
+    }
+
+    pub fn trigger_sync(&mut self, synchronizer: Arc<crate::logic::sync::TaskSynchronizer>) {
+        if self.sync_receiver.is_some() {
+            self.status_message = "Sync already in progress...".to_string();
+            return;
+        }
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.sync_receiver = Some(rx);
+        self.status_message = "Syncing in background...".to_string();
+
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let result = rt.block_on(async {
+                synchronizer.sync().await
+            });
+            let _ = tx.send(result.map_err(|e| e.to_string()));
+        });
     }
 
     pub async fn load_tasks(&mut self) {
@@ -374,20 +411,15 @@ impl App {
 
         // Sort by date (newest first)
         items.sort_by(|a, b| {
-            let date_a = match a {
-                UnifiedMemoItem::DailyReport { date, .. } => chrono::NaiveDateTime::new(*date, chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap()),
-                UnifiedMemoItem::TaskNote { created_at, .. } => *created_at,
-            };
-            let date_b = match b {
-                UnifiedMemoItem::DailyReport { date, .. } => chrono::NaiveDateTime::new(*date, chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap()),
-                UnifiedMemoItem::TaskNote { created_at, .. } => *created_at,
-            };
-            date_b.cmp(&date_a)
+            b.date().cmp(&a.date())
         });
+        
+        let mut tree_state = TreeState::default();
+        tree_state.open(vec![format!("y-{}", now.year())]);
 
         self.unified_memo_list_state = Some(UnifiedMemoListState {
             items,
-            selected_index: 0,
+            tree_state,
         });
     }
 

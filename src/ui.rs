@@ -409,17 +409,35 @@ fn render_detail(f: &mut Frame, app: &mut App) {
             }
         }
 
-        // Display Notes
+        // Display Notes grouped by Date
         if let Some(notes) = app.notes.get(&selected_task.id) {
             detail_lines.push(Line::from(""));
             detail_lines.push(Line::from(vec![
                 Span::styled("--- Memos ---", Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
             ]));
+
+            // Group by date
+            let mut temp_map: std::collections::BTreeMap<chrono::NaiveDate, Vec<&crate::db::task_notes::Model>> = std::collections::BTreeMap::new();
+
             for note in notes {
+                let date = note.created_at.date();
+                temp_map.entry(date).or_default().push(note);
+            }
+
+            // Iterate BTreeMap directly (it's sorted by key ascending, so rev() gives newest first)
+            for (date, mut date_notes) in temp_map.into_iter().rev() {
+                date_notes.sort_by(|a, b| b.created_at.cmp(&a.created_at)); // Sort notes within day desc
+                
                 detail_lines.push(Line::from(vec![
-                    Span::styled(format!("[{}] ", note.created_at.format("%m/%d %H:%M")), Style::default().fg(Color::DarkGray)),
-                    Span::raw(&note.content),
+                    Span::styled(format!("--- {} ---", date.format("%Y-%m-%d")), Style::default().fg(Color::DarkGray)),
                 ]));
+
+                for note in date_notes {
+                    detail_lines.push(Line::from(vec![
+                        Span::styled(format!("  [{}] ", note.created_at.format("%H:%M")), Style::default().fg(Color::Gray)),
+                        Span::raw(&note.content),
+                    ]));
+                }
             }
         }
         
@@ -658,6 +676,9 @@ fn render_review_detail(f: &mut Frame, app: &mut App) {
     f.render_widget(footer, chunks[2]);
 }
 
+use chrono::Datelike;
+use tui_tree_widget::{Tree, TreeItem};
+
 fn render_unified_memo_list(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -667,40 +688,85 @@ fn render_unified_memo_list(f: &mut Frame, app: &mut App) {
         ])
         .split(f.area());
 
-    if let Some(ref state) = app.unified_memo_list_state {
-        let mut list_items: Vec<ListItem> = Vec::new();
-
+    if let Some(ref mut state) = app.unified_memo_list_state {
+        // Group items by hierarchy
+        // Structure: Year -> Month -> Day -> Leaf
+        
+        let mut root_items: Vec<TreeItem<'_, String>> = Vec::new();
+        
+        // We actually need to reconstruct the tree structure every frame since TreeItems hold references.
+        // Grouping logic:
+        let mut hierarchy: std::collections::BTreeMap<i32, std::collections::BTreeMap<u32, std::collections::BTreeMap<chrono::NaiveDate, Vec<&crate::app::UnifiedMemoItem>>>> = std::collections::BTreeMap::new();
+        
         for item in &state.items {
-            let line = match item {
-                crate::app::UnifiedMemoItem::DailyReport { date, title } => {
-                    Line::from(vec![
-                        Span::styled(title, Style::default().fg(Color::Cyan)),
-                    ])
-                }
-                crate::app::UnifiedMemoItem::TaskNote { task_title, created_at, .. } => {
-                    Line::from(vec![
-                        Span::styled("📝 ", Style::default().fg(Color::Yellow)),
-                        Span::raw(format!("{} - {}", task_title, created_at.format("%Y-%m-%d %H:%M"))),
-                    ])
-                }
-            };
-            list_items.push(ListItem::new(line));
+            let date = item.date();
+            let year = date.year();
+            let month = date.month();
+            
+            hierarchy
+                .entry(year)
+                .or_default()
+                .entry(month)
+                .or_default()
+                .entry(date)
+                .or_default()
+                .push(item);
         }
+        
+        for (year, months) in hierarchy.iter().rev() {
+            let mut year_children = Vec::new();
+            
+            for (month, days) in months.iter().rev() {
+                let mut month_children = Vec::new();
+                
+                for (date, items) in days.iter().rev() {
+                    let mut day_children = Vec::new();
+                    
+                    for item in items {
+                         let label = match item {
+                            crate::app::UnifiedMemoItem::DailyReport { title, .. } => title.clone(),
+                            crate::app::UnifiedMemoItem::TaskNote { task_title, created_at, .. } => {
+                                format!("📝 {} ({})", task_title, created_at.format("%H:%M"))
+                            }
+                        };
+                        day_children.push(TreeItem::new_leaf(item.id(), Line::from(label)));
+                    }
+                    
+                    month_children.push(TreeItem::new(
+                        format!("d-{}", date), 
+                        Line::from(format!("{:02}", date.day())), 
+                        day_children
+                    ).expect("Failed to create day node"));
+                }
+                
+                year_children.push(TreeItem::new(
+                    format!("m-{}-{:02}", year, month),
+                    Line::from(chrono::Month::try_from(*month as u8).map(|m| m.name()).unwrap_or("Unknown")),
+                    month_children
+                ).expect("Failed to create month node"));
+            }
+            
+            root_items.push(TreeItem::new(
+                format!("y-{}", year),
+                Line::from(format!("{}", year)),
+                year_children
+            ).expect("Failed to create year node"));
+        }
+        
+        let tree_widget = Tree::new(&root_items)
+            .expect("Failed to create tree widget")
+            .block(Block::default().borders(Borders::ALL).title("Unified Memos (Year > Month > Day)"))
+            .highlight_style(Style::default().fg(Color::Black).bg(Color::White).add_modifier(Modifier::BOLD));
+            
+        f.render_stateful_widget(tree_widget, chunks[0], &mut state.tree_state);
 
-        let list = List::new(list_items)
-            .block(Block::default().borders(Borders::ALL).title("Memos"))
-            .highlight_style(Style::default().bg(Color::Blue).add_modifier(Modifier::BOLD))
-            .highlight_symbol(">> ");
-
-        let mut list_state = ratatui::widgets::ListState::default().with_selected(Some(state.selected_index));
-        f.render_stateful_widget(list, chunks[0], &mut list_state);
     } else {
         let text = Paragraph::new("No memos available")
             .block(Block::default().borders(Borders::ALL).title("Memos"));
         f.render_widget(text, chunks[0]);
     }
 
-    let help = Paragraph::new("↑↓/j/k: Navigate | Enter: Edit/View | Esc: Menu | q: Quit")
+    let help = Paragraph::new("↑↓/j/k: Navigate | Space: Expand/Collapse | Enter: Edit/View | Esc: Menu | q: Quit")
         .style(Style::default().fg(Color::Gray))
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(help, chunks[1]);
