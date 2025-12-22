@@ -1,7 +1,7 @@
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::Rect,
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph, BorderType, Padding, calendar::{Monthly, CalendarEventStore}},
+    widgets::{Block, Borders, BorderType, Padding, calendar::{Monthly, CalendarEventStore}},
     Frame,
 };
 use chrono::{Datelike, NaiveDate};
@@ -14,26 +14,8 @@ pub fn render_calendar(f: &mut Frame, app: &mut App) {
         None => return,
     };
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(10),    // Calendar (takes most space)
-            Constraint::Length(3),  // Help
-        ])
-        .split(f.area());
-
-    // Calendar grid with improved design - title will be in the calendar block
-    render_calendar_grid(f, chunks[0], state);
-
-    // Help text with icons - brighter color for visibility
-    let help = Paragraph::new("◄ ►: Month | ▲ ▼: Week | ⏎: Edit | ⇧⇥: Tasks | ESC: Menu")
-        .style(Style::default().fg(Color::Gray))
-        .alignment(Alignment::Center)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::Gray)));
-    f.render_widget(help, chunks[1]);
+    // Use the entire screen for the calendar
+    render_calendar_grid(f, f.area(), state);
 }
 
 fn render_calendar_grid(f: &mut Frame, area: Rect, state: &CalendarState) {
@@ -60,14 +42,14 @@ fn render_calendar_grid(f: &mut Frame, area: Rect, state: &CalendarState) {
         event_store.add(today_time_date, Style::default().fg(Color::Green).add_modifier(Modifier::BOLD));
     }
 
-    // Create title with month and year
+    // Create title with month, year, and help text
     let title = format!(
-        "📅 Calendar - {} {}",
+        "📅 {} {} | ◄►: Month | ▲▼: Week | ⏎: Edit | ⇧⇥: Tasks | ESC: Menu",
         get_month_name(state.current_month.month()),
         state.current_month.year()
     );
 
-    // Create the calendar widget with padding for better spacing
+    // Create the calendar widget - minimal padding to maximize calendar size
     let calendar = Monthly::new(current_date, event_store)
         .block(Block::default()
             .borders(Borders::ALL)
@@ -75,7 +57,7 @@ fn render_calendar_grid(f: &mut Frame, area: Rect, state: &CalendarState) {
             .title(title)
             .title_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
             .border_style(Style::default().fg(Color::Cyan))
-            .padding(Padding::new(3, 3, 2, 2)))  // left, right, top, bottom padding - increased for larger size
+            .padding(Padding::new(1, 1, 0, 0)))  // Minimal padding - let calendar use all available space
         .show_month_header(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
         .show_weekdays_header(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
         .show_surrounding(Style::default().fg(Color::DarkGray));  // Show surrounding month days
