@@ -1,7 +1,7 @@
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph, BorderType, calendar::{Monthly, CalendarEventStore}},
+    widgets::{Block, Borders, Paragraph, BorderType, Padding, calendar::{Monthly, CalendarEventStore}},
     Frame,
 };
 use chrono::{Datelike, NaiveDate};
@@ -75,16 +75,18 @@ fn render_calendar_grid(f: &mut Frame, area: Rect, state: &CalendarState) {
         event_store.add(today_time_date, Style::default().fg(Color::Green).add_modifier(Modifier::BOLD));
     }
 
-    // Create the calendar widget
+    // Create the calendar widget with padding for better spacing
     let calendar = Monthly::new(current_date, event_store)
         .block(Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .title("Calendar")
             .title_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-            .border_style(Style::default().fg(Color::Cyan)))
+            .border_style(Style::default().fg(Color::Cyan))
+            .padding(Padding::new(2, 2, 1, 1)))  // left, right, top, bottom padding
         .show_month_header(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-        .show_weekdays_header(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+        .show_weekdays_header(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        .show_surrounding(Style::default().fg(Color::DarkGray));  // Show surrounding month days
 
     f.render_widget(calendar, area);
 }
