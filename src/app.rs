@@ -25,6 +25,7 @@ pub enum CurrentView {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CurrentScreen {
+    Menu,
     Dashboard,
     Detail,
     Timer,
@@ -188,7 +189,7 @@ impl App {
             report_storage,
             tasks: Vec::new(),
             notes: HashMap::new(),
-            status_message: "Press 's' to sync, 't' to toggle timer, 'n' to add note, 'm' for memos, Shift+Tab for calendar, Esc to quit.".to_string(),
+            status_message: "Press 's' to sync, 't' to toggle timer, 'n' to add note, 'm' for memos, Shift+Tab for calendar, Esc for menu, q to quit.".to_string(),
             selected_task_index: 0,
             timer: TimerState {
                 active_task_id: None,
@@ -198,7 +199,7 @@ impl App {
             input_mode: false,
             input_buffer: String::new(),
             current_view: CurrentView::Development,
-            current_screen: CurrentScreen::Dashboard,
+            current_screen: CurrentScreen::Menu,
             sync_state: SyncState {
                 last_sync_time: None,
                 total_tasks: 0,

@@ -111,7 +111,7 @@ pub fn draw_memo_list(app: &mut App, frame: &mut Frame) {
     frame.render_widget(preview, main_layout[1]);
 
     // --- Bottom: Help ---
-    let help_text = "n: 新規作成 | Enter/e: 編集 | Space/→: 展開/折畳 | h/l: 前後 | d: 削除 | Esc: ダッシュボードへ | ↑↓/j/k: 移動";
+    let help_text = "n: 新規作成 | Enter/e: 編集 | Space/→: 展開/折畳 | h/l: 前後 | d: 削除 | Esc: メニューへ | ↑↓/j/k: 移動";
     let help = Paragraph::new(help_text)
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().fg(Color::Gray));

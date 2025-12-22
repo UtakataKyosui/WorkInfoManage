@@ -19,6 +19,7 @@ static LINK_REGEX: Lazy<regex::Regex> = Lazy::new(|| {
 
 pub fn ui(f: &mut Frame, app: &mut App) {
     match app.current_screen {
+        CurrentScreen::Menu => render_menu(f, app),
         CurrentScreen::Dashboard => render_dashboard(f, app),
         CurrentScreen::Detail => render_detail(f, app),
         CurrentScreen::Timer => render_timer(f, app),
@@ -29,6 +30,65 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         CurrentScreen::MemoList => crate::memo::ui::draw_memo_list(app, f),
         CurrentScreen::MemoEdit => crate::memo::ui::draw_memo_edit(app, f),
     }
+}
+
+fn render_menu(f: &mut Frame, _app: &mut App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(4)
+        .constraints([
+            Constraint::Length(5),   // Title
+            Constraint::Min(10),     // Menu items
+            Constraint::Length(3),   // Help
+        ])
+        .split(f.area());
+
+    // Title
+    let title = Paragraph::new(vec![
+        Line::from(vec![
+            Span::styled("WorkInfoManage", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(""),
+        Line::from("Unified task management, daily reports, and markdown memos"),
+    ])
+    .alignment(Alignment::Center)
+    .block(Block::default().borders(Borders::ALL));
+    f.render_widget(title, chunks[0]);
+
+    // Menu items
+    let menu_items = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("1", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::raw(" - Task Manager (Dashboard)"),
+        ]),
+        Line::from("    Manage tasks with Asana/GitHub sync, Pomodoro timer"),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("2", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::raw(" - Calendar & Daily Reports"),
+        ]),
+        Line::from("    View calendar and edit daily reports"),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("3", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::raw(" - Markdown Memos"),
+        ]),
+        Line::from("    Create and organize markdown notes with tree view"),
+        Line::from(""),
+    ];
+
+    let menu = Paragraph::new(menu_items)
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL).title("Select a feature"));
+    f.render_widget(menu, chunks[1]);
+
+    // Help
+    let help = Paragraph::new("Press 1, 2, or 3 to select | q: Quit")
+        .style(Style::default().fg(Color::Gray))
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL));
+    f.render_widget(help, chunks[2]);
 }
 
 fn render_editor(f: &mut Frame, app: &mut App) {

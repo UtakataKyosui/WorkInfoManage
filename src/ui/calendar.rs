@@ -38,7 +38,7 @@ pub fn render_calendar(f: &mut Frame, app: &mut App) {
     render_calendar_grid(f, chunks[1], state);
 
     // Help text
-    let help = Paragraph::new("← →: Change month | ↑↓: Move week | Enter: Edit report | m: Memos | Shift+Tab: Back to tasks | Esc: Exit")
+    let help = Paragraph::new("← →: Change month | ↑↓: Move week | Enter: Edit report | m: Memos | Shift+Tab: Back to tasks | Esc: Menu")
         .style(Style::default().fg(Color::Gray))
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));

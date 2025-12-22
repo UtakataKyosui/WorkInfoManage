@@ -227,9 +227,28 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                     }
                     
                     match app.current_screen {
-                        work_info_manage::app::CurrentScreen::Dashboard => {
+                        work_info_manage::app::CurrentScreen::Menu => {
                             match key.code {
                                 KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
+                                KeyCode::Char('1') => {
+                                    app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
+                                }
+                                KeyCode::Char('2') => {
+                                    app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
+                                    app.calendar_state = Some(work_info_manage::app::CalendarState::new());
+                                }
+                                KeyCode::Char('3') => {
+                                    app.current_screen = work_info_manage::app::CurrentScreen::MemoList;
+                                }
+                                _ => {}
+                            }
+                        }
+                        work_info_manage::app::CurrentScreen::Dashboard => {
+                            match key.code {
+                                KeyCode::Char('q') => app.should_quit = true,
+                                KeyCode::Esc => {
+                                    app.current_screen = work_info_manage::app::CurrentScreen::Menu;
+                                }
                                 KeyCode::Char('m') => {
                                     // Go to Memo List
                                     app.current_screen = work_info_manage::app::CurrentScreen::MemoList;
@@ -357,7 +376,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                         work_info_manage::app::CurrentScreen::Calendar => {
                             match key.code {
                                 KeyCode::Esc => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
+                                    app.current_screen = work_info_manage::app::CurrentScreen::Menu;
                                     app.calendar_state = None;
                                 }
                                 KeyCode::Char('m') => {
@@ -441,7 +460,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                         work_info_manage::app::CurrentScreen::MemoList => {
                             match key.code {
                                 KeyCode::Esc => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
+                                    app.current_screen = work_info_manage::app::CurrentScreen::Menu;
                                 }
                                 KeyCode::Down | KeyCode::Char('j') => {
                                     app.memo_state.tree_state.key_down();
