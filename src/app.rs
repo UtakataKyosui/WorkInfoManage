@@ -188,7 +188,7 @@ impl App {
             report_storage,
             tasks: Vec::new(),
             notes: HashMap::new(),
-            status_message: "Press 's' to sync, 't' to toggle timer, 'n' to add note, Shift+Tab for calendar, Esc to quit.".to_string(),
+            status_message: "Press 's' to sync, 't' to toggle timer, 'n' to add note, 'm' for memos, Shift+Tab for calendar, Esc to quit.".to_string(),
             selected_task_index: 0,
             timer: TimerState {
                 active_task_id: None,

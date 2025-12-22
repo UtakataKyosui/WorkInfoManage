@@ -13,7 +13,9 @@
       "Bash(git restore:*)",
       "Bash(find:*)",
       "Bash(git checkout:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git remote add:*)"
     ],
     "deny": [],
     "ask": []

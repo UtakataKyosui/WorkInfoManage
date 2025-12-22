@@ -230,6 +230,10 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                         work_info_manage::app::CurrentScreen::Dashboard => {
                             match key.code {
                                 KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
+                                KeyCode::Char('m') => {
+                                    // Go to Memo List
+                                    app.current_screen = work_info_manage::app::CurrentScreen::MemoList;
+                                }
                                 KeyCode::Char('s') => {
                                     // Sync tasks
                                     app.status_message = "Syncing...".to_string();
@@ -437,7 +441,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                         work_info_manage::app::CurrentScreen::MemoList => {
                             match key.code {
                                 KeyCode::Esc => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
+                                    app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
                                 }
                                 KeyCode::Down | KeyCode::Char('j') => {
                                     app.memo_state.tree_state.key_down();
