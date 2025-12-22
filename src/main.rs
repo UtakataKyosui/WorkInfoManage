@@ -222,7 +222,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                     }
                                 }
                                 KeyCode::Down | KeyCode::Char('j') => {
-                                    if app.menu_selection < 1 {
+                                    if app.menu_selection < 2 {
                                         app.menu_selection += 1;
                                     }
                                 }
@@ -271,6 +271,11 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                             app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
                                             app.calendar_state = Some(work_info_manage::app::CalendarState::new());
                                         }
+                                        2 => {
+                                            // All Memos - build unified list
+                                            app.build_unified_memo_list().await;
+                                            app.current_screen = work_info_manage::app::CurrentScreen::UnifiedMemoList;
+                                        }
                                         _ => {}
                                     }
                                 }
@@ -279,6 +284,9 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                 }
                                 KeyCode::Char('2') => {
                                     app.menu_selection = 1;
+                                }
+                                KeyCode::Char('3') => {
+                                    app.menu_selection = 2;
                                 }
                                 _ => {}
                             }
@@ -524,6 +532,55 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                 }
                                 KeyCode::Char('e') => {
                                     app.current_screen = work_info_manage::app::CurrentScreen::ReportEditor;
+                                }
+                                _ => {}
+                            }
+                        }
+                        work_info_manage::app::CurrentScreen::UnifiedMemoList => {
+                            match key.code {
+                                KeyCode::Char('q') | KeyCode::Esc => {
+                                    app.current_screen = work_info_manage::app::CurrentScreen::Menu;
+                                    app.unified_memo_list_state = None;
+                                }
+                                KeyCode::Down | KeyCode::Char('j') => {
+                                    if let Some(ref mut state) = app.unified_memo_list_state {
+                                        if state.selected_index < state.items.len().saturating_sub(1) {
+                                            state.selected_index += 1;
+                                        }
+                                    }
+                                }
+                                KeyCode::Up | KeyCode::Char('k') => {
+                                    if let Some(ref mut state) = app.unified_memo_list_state {
+                                        if state.selected_index > 0 {
+                                            state.selected_index -= 1;
+                                        }
+                                    }
+                                }
+                                KeyCode::Enter => {
+                                    if let Some(ref state) = app.unified_memo_list_state {
+                                        if let Some(item) = state.items.get(state.selected_index) {
+                                            match item {
+                                                work_info_manage::app::UnifiedMemoItem::DailyReport { date, .. } => {
+                                                    // Load and edit daily report
+                                                    let content = if let Ok(Some(report)) = app.report_storage.load_report(*date).await {
+                                                        report.content
+                                                    } else {
+                                                        String::new()
+                                                    };
+
+                                                    app.editor_state = Some(work_info_manage::app::EditorState::new(*date, content));
+                                                    app.current_screen = work_info_manage::app::CurrentScreen::ReportEditor;
+                                                }
+                                                work_info_manage::app::UnifiedMemoItem::TaskNote { task_id, note_id, .. } => {
+                                                    // Find and navigate to the task
+                                                    if let Some(task_index) = app.tasks.iter().position(|t| t.id == *task_id) {
+                                                        app.selected_task_index = task_index;
+                                                        app.current_screen = work_info_manage::app::CurrentScreen::Detail;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 _ => {}
                             }

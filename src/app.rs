@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use chrono::{DateTime, Local, NaiveDate};
+use chrono::{DateTime, Local, NaiveDate, Datelike};
 use tui_textarea::TextArea;
 use tui_tree_widget::TreeState;
 use arboard::Clipboard;
@@ -33,6 +33,7 @@ pub enum CurrentScreen {
     Calendar,
     ReportEditor,
     ReportPreview,
+    UnifiedMemoList,
 }
 
 pub struct CalendarState {
@@ -101,6 +102,17 @@ pub struct MemoState {
     pub memo_textarea: TextArea<'static>,
     pub editing_memo_path: Option<PathBuf>,
     pub clipboard: Option<Clipboard>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UnifiedMemoItem {
+    DailyReport { date: NaiveDate, title: String },
+    TaskNote { task_id: i32, task_title: String, note_id: i32, created_at: chrono::NaiveDateTime },
+}
+
+pub struct UnifiedMemoListState {
+    pub items: Vec<UnifiedMemoItem>,
+    pub selected_index: usize,
 }
 
 impl Default for MemoState {
@@ -179,6 +191,7 @@ pub struct App {
     pub editor_state: Option<EditorState>,
     pub preview_state: Option<PreviewState>,
     pub memo_state: MemoState,
+    pub unified_memo_list_state: Option<UnifiedMemoListState>,
     pub menu_selection: usize,
     pub tasks_loaded: bool,
 }
@@ -213,6 +226,7 @@ impl App {
             editor_state: None,
             preview_state: None,
             memo_state: MemoState::new(),
+            unified_memo_list_state: None,
             menu_selection: 0,
             tasks_loaded: false,
         }
@@ -322,6 +336,59 @@ impl App {
     pub fn is_task_visible(&self, task: &crate::db::tasks::Model) -> bool {
         let visible_statuses = self.get_visible_statuses();
         visible_statuses.contains(&task.status.as_str())
+    }
+
+    pub async fn build_unified_memo_list(&mut self) {
+        let mut items = Vec::new();
+
+        // Add Daily Reports from the last 12 months
+        let now = chrono::Local::now().naive_local().date();
+        for month_offset in 0..12 {
+            let target_date = now - chrono::Months::new(month_offset);
+            let year = target_date.year();
+            let month = target_date.month();
+
+            if let Ok(dates) = self.report_storage.list_report_dates(year, month).await {
+                for date in dates {
+                    items.push(UnifiedMemoItem::DailyReport {
+                        date,
+                        title: format!("📅 日次 {}", date.format("%Y-%m-%d")),
+                    });
+                }
+            }
+        }
+
+        // Add Task Notes
+        for (task_id, notes) in &self.notes {
+            if let Some(task) = self.tasks.iter().find(|t| t.id == *task_id) {
+                for note in notes {
+                    items.push(UnifiedMemoItem::TaskNote {
+                        task_id: *task_id,
+                        task_title: task.title.clone(),
+                        note_id: note.id,
+                        created_at: note.created_at,
+                    });
+                }
+            }
+        }
+
+        // Sort by date (newest first)
+        items.sort_by(|a, b| {
+            let date_a = match a {
+                UnifiedMemoItem::DailyReport { date, .. } => chrono::NaiveDateTime::new(*date, chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap()),
+                UnifiedMemoItem::TaskNote { created_at, .. } => *created_at,
+            };
+            let date_b = match b {
+                UnifiedMemoItem::DailyReport { date, .. } => chrono::NaiveDateTime::new(*date, chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap()),
+                UnifiedMemoItem::TaskNote { created_at, .. } => *created_at,
+            };
+            date_b.cmp(&date_a)
+        });
+
+        self.unified_memo_list_state = Some(UnifiedMemoListState {
+            items,
+            selected_index: 0,
+        });
     }
 
     pub fn get_sorted_visible_indices(&self) -> Vec<usize> {

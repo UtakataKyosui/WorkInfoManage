@@ -27,6 +27,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         CurrentScreen::Calendar => calendar::render_calendar(f, app),
         CurrentScreen::ReportEditor => render_editor(f, app),
         CurrentScreen::ReportPreview => render_preview(f, app),
+        CurrentScreen::UnifiedMemoList => render_unified_memo_list(f, app),
     }
 }
 
@@ -65,6 +66,12 @@ fn render_menu(f: &mut Frame, app: &mut App) {
                 Span::styled("Calendar & Daily Reports", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
             ]),
             Line::from("  View calendar and edit daily reports with markdown editor support"),
+        ]),
+        ListItem::new(vec![
+            Line::from(vec![
+                Span::styled("All Memos", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            ]),
+            Line::from("  Browse all daily reports and task notes in one place"),
         ]),
     ];
 
@@ -649,4 +656,52 @@ fn render_review_detail(f: &mut Frame, app: &mut App) {
     let footer = Paragraph::new(footer_text)
         .block(Block::default().borders(Borders::ALL).title("Controls"));
     f.render_widget(footer, chunks[2]);
+}
+
+fn render_unified_memo_list(f: &mut Frame, app: &mut App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(0),     // Memo list
+            Constraint::Length(3),  // Help
+        ])
+        .split(f.area());
+
+    if let Some(ref state) = app.unified_memo_list_state {
+        let mut list_items: Vec<ListItem> = Vec::new();
+
+        for item in &state.items {
+            let line = match item {
+                crate::app::UnifiedMemoItem::DailyReport { date, title } => {
+                    Line::from(vec![
+                        Span::styled(title, Style::default().fg(Color::Cyan)),
+                    ])
+                }
+                crate::app::UnifiedMemoItem::TaskNote { task_title, created_at, .. } => {
+                    Line::from(vec![
+                        Span::styled("📝 ", Style::default().fg(Color::Yellow)),
+                        Span::raw(format!("{} - {}", task_title, created_at.format("%Y-%m-%d %H:%M"))),
+                    ])
+                }
+            };
+            list_items.push(ListItem::new(line));
+        }
+
+        let list = List::new(list_items)
+            .block(Block::default().borders(Borders::ALL).title("Memos"))
+            .highlight_style(Style::default().bg(Color::Blue).add_modifier(Modifier::BOLD))
+            .highlight_symbol(">> ");
+
+        let mut list_state = ratatui::widgets::ListState::default().with_selected(Some(state.selected_index));
+        f.render_stateful_widget(list, chunks[0], &mut list_state);
+    } else {
+        let text = Paragraph::new("No memos available")
+            .block(Block::default().borders(Borders::ALL).title("Memos"));
+        f.render_widget(text, chunks[0]);
+    }
+
+    let help = Paragraph::new("↑↓/j/k: Navigate | Enter: Edit/View | Esc: Menu | q: Quit")
+        .style(Style::default().fg(Color::Gray))
+        .block(Block::default().borders(Borders::ALL));
+    f.render_widget(help, chunks[1]);
 }
