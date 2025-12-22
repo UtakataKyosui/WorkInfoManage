@@ -15,7 +15,6 @@ pub fn render_calendar(f: &mut Frame, app: &mut App) {
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(2)
         .constraints([
             Constraint::Length(3),  // Title
             Constraint::Min(10),    // Calendar

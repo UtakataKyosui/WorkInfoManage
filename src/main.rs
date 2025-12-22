@@ -352,7 +352,9 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                     app.select_prev_task();
                                 }
                                 KeyCode::Enter => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Detail;
+                                    if !app.tasks.is_empty() {
+                                        app.current_screen = work_info_manage::app::CurrentScreen::Detail;
+                                    }
                                 }
                                 KeyCode::Char('T') => { // Shift+t
                                     app.current_screen = work_info_manage::app::CurrentScreen::Timer;
@@ -488,6 +490,12 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                                 app.editor_state = None;
                                             }
                                         }
+                                    }
+                                    KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                                        // Cancel without saving
+                                        app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
+                                        app.editor_state = None;
+                                        app.status_message = "Cancelled.".to_string();
                                     }
                                     KeyCode::Char('v') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                                         if let Some(ref mut clipboard) = app.memo_state.clipboard {

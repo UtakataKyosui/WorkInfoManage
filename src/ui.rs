@@ -102,7 +102,7 @@ fn render_editor(f: &mut Frame, app: &mut App) {
         );
         f.render_widget(&editor.textarea, layout[0]);
 
-        let help = Paragraph::new("Esc: Save & Return | Ctrl+s: Save | Ctrl+v: Paste | Alt+c: Copy | Search highlights headers & bold")
+        let help = Paragraph::new("Esc: Save & Return | Ctrl+s: Save | Ctrl+c: Cancel | Ctrl+v: Paste | Alt+c: Copy | Search highlights headers & bold")
             .block(Block::default().borders(Borders::ALL))
             .style(Style::default().fg(Color::Gray));
         f.render_widget(help, layout[1]);
