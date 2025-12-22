@@ -33,8 +33,6 @@ pub enum CurrentScreen {
     Calendar,
     ReportEditor,
     ReportPreview,
-    MemoList,
-    MemoEdit,
 }
 
 pub struct CalendarState {
@@ -68,6 +66,7 @@ pub struct EditorState {
 impl EditorState {
     pub fn new(date: NaiveDate, content: String) -> Self {
         let mut textarea = TextArea::default();
+        MemoState::configure_textarea(&mut textarea);
         textarea.insert_str(content);
         Self { textarea, date }
     }
@@ -172,6 +171,7 @@ pub struct App {
     pub timer: TimerState,
     pub input_mode: bool,
     pub input_buffer: String,
+    pub task_note_textarea: Option<TextArea<'static>>,
     pub current_view: CurrentView,
     pub current_screen: CurrentScreen,
     pub sync_state: SyncState,
@@ -200,6 +200,7 @@ impl App {
             },
             input_mode: false,
             input_buffer: String::new(),
+            task_note_textarea: None,
             current_view: CurrentView::Development,
             current_screen: CurrentScreen::Menu,
             sync_state: SyncState {
@@ -273,20 +274,27 @@ impl App {
     }
 
     pub async fn save_note(&mut self) {
-        if self.input_buffer.trim().is_empty() {
+        let content = if let Some(ref textarea) = self.task_note_textarea {
+            textarea.lines().join("\n")
+        } else {
+            self.input_buffer.clone()
+        };
+
+        if content.trim().is_empty() {
             return;
         }
+
         if let Some(task) = self.tasks.get(self.selected_task_index) {
             use crate::db::task_notes;
             use chrono::Utc;
-            
+
             let note = task_notes::Model {
                 id: 0,
                 task_id: task.id,
-                content: self.input_buffer.clone(),
+                content,
                 created_at: Utc::now().naive_utc(),
             };
-            
+
             match self.storage.save_note(&note).await {
                 Ok(saved_note) => {
                     self.notes.entry(task.id).or_default().push(saved_note);
@@ -299,6 +307,7 @@ impl App {
             }
         }
         self.input_buffer.clear();
+        self.task_note_textarea = None;
         self.input_mode = false;
     }
 

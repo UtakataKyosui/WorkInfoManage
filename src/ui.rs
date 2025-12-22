@@ -27,8 +27,6 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         CurrentScreen::Calendar => calendar::render_calendar(f, app),
         CurrentScreen::ReportEditor => render_editor(f, app),
         CurrentScreen::ReportPreview => render_preview(f, app),
-        CurrentScreen::MemoList => crate::memo::ui::draw_memo_list(app, f),
-        CurrentScreen::MemoEdit => crate::memo::ui::draw_memo_edit(app, f),
     }
 }
 
@@ -60,19 +58,13 @@ fn render_menu(f: &mut Frame, app: &mut App) {
             Line::from(vec![
                 Span::styled("Task Manager", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
             ]),
-            Line::from("  Manage tasks with Asana/GitHub sync, Pomodoro timer, and work logs"),
+            Line::from("  Manage tasks with Asana/GitHub sync, Pomodoro timer, work logs, and markdown notes"),
         ]),
         ListItem::new(vec![
             Line::from(vec![
                 Span::styled("Calendar & Daily Reports", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
             ]),
-            Line::from("  View calendar and edit daily reports with markdown support"),
-        ]),
-        ListItem::new(vec![
-            Line::from(vec![
-                Span::styled("Markdown Memos", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            ]),
-            Line::from("  Create and organize markdown notes with tree view and search"),
+            Line::from("  View calendar and edit daily reports with markdown editor support"),
         ]),
     ];
 
@@ -96,13 +88,25 @@ fn render_menu(f: &mut Frame, app: &mut App) {
 }
 
 fn render_editor(f: &mut Frame, app: &mut App) {
-    let block = Block::default()
-        .title("Report Editor (Coming Soon)")
-        .borders(Borders::ALL);
-    let paragraph = Paragraph::new("Editor view will be implemented here.\nPress Esc to return.")
-        .block(block)
-        .alignment(Alignment::Center);
-    f.render_widget(paragraph, f.area());
+    if let Some(ref mut editor) = app.editor_state {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(0), Constraint::Length(3)])
+            .split(f.area());
+
+        editor.textarea.set_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!("Daily Report - {}", editor.date.format("%Y-%m-%d")))
+                .style(Style::default().fg(Color::Cyan)),
+        );
+        f.render_widget(&editor.textarea, layout[0]);
+
+        let help = Paragraph::new("Esc: Save & Return | Ctrl+s: Save | Ctrl+v: Paste | Alt+c: Copy | Search highlights headers & bold")
+            .block(Block::default().borders(Borders::ALL))
+            .style(Style::default().fg(Color::Gray));
+        f.render_widget(help, layout[1]);
+    }
 }
 
 fn render_preview(f: &mut Frame, app: &mut App) {
@@ -431,20 +435,44 @@ fn render_detail(f: &mut Frame, app: &mut App) {
         .block(Block::default().borders(Borders::ALL).title("Controls"));
     f.render_widget(footer, chunks[1]);
     
-     // Input Popup (Only relevant in Detail view usually)
+     // Input Popup - TextArea for Markdown editing
     if app.input_mode {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title("Add Memo")
-            .style(Style::default().bg(Color::Blue).fg(Color::White));
-        
-        let area = centered_rect(60, 20, f.area());
-        f.render_widget(ratatui::widgets::Clear, area); // Clear background
-        
-        let input = Paragraph::new(app.input_buffer.as_str())
-            .style(Style::default().fg(Color::Yellow))
-            .block(block);
-        f.render_widget(input, area);
+        if let Some(ref mut textarea) = app.task_note_textarea {
+            let area = centered_rect(80, 60, f.area());
+            f.render_widget(ratatui::widgets::Clear, area); // Clear background
+
+            let layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(0), Constraint::Length(3)])
+                .split(area);
+
+            textarea.set_block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Add Note (Markdown)")
+                    .style(Style::default().fg(Color::Cyan)),
+            );
+            f.render_widget(&*textarea, layout[0]);
+
+            let help = Paragraph::new("Esc: Save & Close | Ctrl+c: Cancel | Ctrl+v: Paste | Alt+c: Copy | Search highlights headers & bold")
+                .block(Block::default().borders(Borders::ALL))
+                .style(Style::default().fg(Color::Gray));
+            f.render_widget(help, layout[1]);
+        } else {
+            // Fallback to simple input buffer
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title("Add Memo")
+                .style(Style::default().bg(Color::Blue).fg(Color::White));
+
+            let area = centered_rect(60, 20, f.area());
+            f.render_widget(ratatui::widgets::Clear, area); // Clear background
+
+            let input = Paragraph::new(app.input_buffer.as_str())
+                .style(Style::default().fg(Color::Yellow))
+                .block(block);
+            f.render_widget(input, area);
+        }
     }
 }
 

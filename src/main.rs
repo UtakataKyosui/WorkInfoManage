@@ -129,24 +129,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn save_current_memo(app: &mut App) {
-    use work_info_manage::memo::Memo;
-
-    let content = app.memo_state.memo_textarea.lines().join("\n");
-    let memo = if let Some(path) = &app.memo_state.editing_memo_path {
-        Memo {
-            path: path.clone(),
-            content,
-            id: path.to_string_lossy().to_string(),
-        }
-    } else {
-        Memo::new(content)
-    };
-
-    if let Ok(()) = memo.save() {
-        app.memo_state.editing_memo_path = Some(memo.path);
-    }
-}
 
 async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, synchronizer: &TaskSynchronizer, storage: Arc<dyn work_info_manage::storage::Storage>) -> io::Result<()> {
     // Pomodoro timer configuration (15 minutes)
@@ -158,22 +140,53 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
         if event::poll(std::time::Duration::from_secs(1))? {
             if let Event::Key(key) = event::read()? {
                 if app.input_mode {
-                    match key.code {
-                        KeyCode::Enter => {
-                            app.save_note().await;
+                    if let Some(ref mut textarea) = app.task_note_textarea {
+                        // TextArea mode - Markdown editing
+                        match key.code {
+                            KeyCode::Esc => {
+                                app.save_note().await;
+                            }
+                            KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                                app.input_mode = false;
+                                app.task_note_textarea = None;
+                                app.status_message = "Note cancelled.".to_string();
+                            }
+                            KeyCode::Char('v') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                                if let Some(ref mut clipboard) = app.memo_state.clipboard {
+                                    if let Ok(text) = clipboard.get_text() {
+                                        textarea.insert_str(text);
+                                    }
+                                }
+                            }
+                            KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::ALT) => {
+                                if let Some(ref mut clipboard) = app.memo_state.clipboard {
+                                    let text = textarea.lines().join("\n");
+                                    let _ = clipboard.set_text(text);
+                                }
+                            }
+                            _ => {
+                                textarea.input(key);
+                            }
                         }
-                        KeyCode::Esc => {
-                            app.input_mode = false;
-                            app.input_buffer.clear();
-                            app.status_message = "Note cancelled.".to_string();
+                    } else {
+                        // Fallback to simple input buffer
+                        match key.code {
+                            KeyCode::Enter => {
+                                app.save_note().await;
+                            }
+                            KeyCode::Esc => {
+                                app.input_mode = false;
+                                app.input_buffer.clear();
+                                app.status_message = "Note cancelled.".to_string();
+                            }
+                            KeyCode::Char(c) => {
+                                app.input_buffer.push(c);
+                            }
+                            KeyCode::Backspace => {
+                                app.input_buffer.pop();
+                            }
+                            _ => {}
                         }
-                        KeyCode::Char(c) => {
-                            app.input_buffer.push(c);
-                        }
-                        KeyCode::Backspace => {
-                            app.input_buffer.pop();
-                        }
-                        _ => {}
                     }
                 } else {
                     // Global Keys
@@ -209,7 +222,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                     }
                                 }
                                 KeyCode::Down | KeyCode::Char('j') => {
-                                    if app.menu_selection < 2 {
+                                    if app.menu_selection < 1 {
                                         app.menu_selection += 1;
                                     }
                                 }
@@ -258,10 +271,6 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                             app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
                                             app.calendar_state = Some(work_info_manage::app::CalendarState::new());
                                         }
-                                        2 => {
-                                            // Markdown Memos
-                                            app.current_screen = work_info_manage::app::CurrentScreen::MemoList;
-                                        }
                                         _ => {}
                                     }
                                 }
@@ -271,9 +280,6 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                 KeyCode::Char('2') => {
                                     app.menu_selection = 1;
                                 }
-                                KeyCode::Char('3') => {
-                                    app.menu_selection = 2;
-                                }
                                 _ => {}
                             }
                         }
@@ -282,10 +288,6 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                 KeyCode::Char('q') => app.should_quit = true,
                                 KeyCode::Esc => {
                                     app.current_screen = work_info_manage::app::CurrentScreen::Menu;
-                                }
-                                KeyCode::Char('m') => {
-                                    // Go to Memo List
-                                    app.current_screen = work_info_manage::app::CurrentScreen::MemoList;
                                 }
                                 KeyCode::Char('s') => {
                                     // Sync tasks
@@ -382,8 +384,12 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                     app.current_screen = work_info_manage::app::CurrentScreen::ReviewDetail;
                                 }
                                 KeyCode::Char('n') => {
+                                    // Initialize TextArea for markdown editing
+                                    let mut textarea = tui_textarea::TextArea::default();
+                                    work_info_manage::app::MemoState::configure_textarea(&mut textarea);
+                                    app.task_note_textarea = Some(textarea);
                                     app.input_mode = true;
-                                    app.status_message = "Enter note (Enter to save, Esc to cancel)".to_string();
+                                    app.status_message = "Enter note (Esc to save, Ctrl+c to cancel)".to_string();
                                 }
                                 _ => {}
                             }
@@ -412,10 +418,6 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                 KeyCode::Esc => {
                                     app.current_screen = work_info_manage::app::CurrentScreen::Menu;
                                     app.calendar_state = None;
-                                }
-                                KeyCode::Char('m') => {
-                                    // Transition to Memo List
-                                    app.current_screen = work_info_manage::app::CurrentScreen::MemoList;
                                 }
                                 KeyCode::Left => {
                                     if let Some(ref mut state) = app.calendar_state {
@@ -471,12 +473,39 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                             }
                         }
                         work_info_manage::app::CurrentScreen::ReportEditor => {
-                            match key.code {
-                                KeyCode::Esc => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
-                                    app.editor_state = None;
+                            if let Some(ref mut editor) = app.editor_state {
+                                match key.code {
+                                    KeyCode::Esc | KeyCode::Char('s') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                                        // Save report
+                                        let content = editor.textarea.lines().join("\n");
+                                        let report = work_info_manage::report::DailyReport::new(editor.date, content);
+                                        if let Err(e) = app.report_storage.save_report(&report).await {
+                                            app.status_message = format!("Failed to save report: {}", e);
+                                        } else {
+                                            app.status_message = "Report saved.".to_string();
+                                            if key.code == KeyCode::Esc {
+                                                app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
+                                                app.editor_state = None;
+                                            }
+                                        }
+                                    }
+                                    KeyCode::Char('v') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                                        if let Some(ref mut clipboard) = app.memo_state.clipboard {
+                                            if let Ok(text) = clipboard.get_text() {
+                                                editor.textarea.insert_str(text);
+                                            }
+                                        }
+                                    }
+                                    KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::ALT) => {
+                                        if let Some(ref mut clipboard) = app.memo_state.clipboard {
+                                            let text = editor.textarea.lines().join("\n");
+                                            let _ = clipboard.set_text(text);
+                                        }
+                                    }
+                                    _ => {
+                                        editor.textarea.input(key);
+                                    }
                                 }
-                                _ => {}
                             }
                         }
                         work_info_manage::app::CurrentScreen::ReportPreview => {
@@ -489,97 +518,6 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                                     app.current_screen = work_info_manage::app::CurrentScreen::ReportEditor;
                                 }
                                 _ => {}
-                            }
-                        }
-                        work_info_manage::app::CurrentScreen::MemoList => {
-                            match key.code {
-                                KeyCode::Esc => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Menu;
-                                }
-                                KeyCode::Down | KeyCode::Char('j') => {
-                                    app.memo_state.tree_state.key_down();
-                                }
-                                KeyCode::Up | KeyCode::Char('k') => {
-                                    app.memo_state.tree_state.key_up();
-                                }
-                                KeyCode::Left | KeyCode::Char('h') => {
-                                    app.memo_state.tree_state.key_left();
-                                }
-                                KeyCode::Right | KeyCode::Char('l') => {
-                                    app.memo_state.tree_state.key_right();
-                                }
-                                KeyCode::Char(' ') => {
-                                    app.memo_state.tree_state.toggle_selected();
-                                }
-                                KeyCode::Char('n') => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::MemoEdit;
-                                    app.memo_state.memo_textarea = tui_textarea::TextArea::default();
-                                    work_info_manage::app::MemoState::configure_textarea(&mut app.memo_state.memo_textarea);
-                                    app.memo_state.editing_memo_path = None;
-                                }
-                                KeyCode::Enter | KeyCode::Char('e') => {
-                                    if let Some(selected_id) = app.memo_state.tree_state.selected().last() {
-                                        let path_str = selected_id.split("::").next().unwrap_or("");
-
-                                        if let Some(memo) = app.memo_state.memos.iter().find(|m| m.id == path_str) {
-                                            app.current_screen = work_info_manage::app::CurrentScreen::MemoEdit;
-                                            let lines: Vec<String> = memo.content.lines().map(|s| s.to_string()).collect();
-                                            app.memo_state.memo_textarea = tui_textarea::TextArea::new(lines);
-
-                                            if let Some(line_part) = selected_id.split("::").nth(1) {
-                                                if let Ok(line_idx) = line_part.parse::<usize>() {
-                                                    app.memo_state.memo_textarea.move_cursor(tui_textarea::CursorMove::Jump(line_idx as u16, 0));
-                                                }
-                                            }
-
-                                            work_info_manage::app::MemoState::configure_textarea(&mut app.memo_state.memo_textarea);
-                                            app.memo_state.editing_memo_path = Some(memo.path.clone());
-                                        } else {
-                                            app.memo_state.tree_state.toggle_selected();
-                                        }
-                                    }
-                                }
-                                KeyCode::Char('d') => {
-                                    if let Some(selected_id) = app.memo_state.tree_state.selected().last() {
-                                        let path_str = selected_id.split("::").next().unwrap_or("");
-                                        if let Some(memo) = app.memo_state.memos.iter().find(|m| m.id == path_str) {
-                                            if memo.delete().is_ok() {
-                                                let _ = app.memo_state.reload_memos();
-                                            }
-                                        }
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                        work_info_manage::app::CurrentScreen::MemoEdit => {
-                            use tui_textarea::Input;
-                            use crossterm::event::KeyModifiers;
-
-                            match key.code {
-                                KeyCode::Esc => {
-                                    // Save and return to list
-                                    save_current_memo(&mut app).await;
-                                    app.current_screen = work_info_manage::app::CurrentScreen::MemoList;
-                                    let _ = app.memo_state.reload_memos();
-                                }
-                                KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                    save_current_memo(&mut app).await;
-                                }
-                                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::MemoList;
-                                }
-                                KeyCode::Char('v') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                                    if let Some(clipboard) = &mut app.memo_state.clipboard {
-                                        if let Ok(text) = clipboard.get_text() {
-                                            let text = text.replace("\r\n", "\n");
-                                            app.memo_state.memo_textarea.insert_str(text);
-                                        }
-                                    }
-                                }
-                                _ => {
-                                    app.memo_state.memo_textarea.input(Input::from(key));
-                                }
                             }
                         }
                     }
