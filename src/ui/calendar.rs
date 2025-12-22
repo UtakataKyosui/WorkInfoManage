@@ -1,10 +1,10 @@
 use ratatui::{
-    layout::{Constraint, Rect, Layout, Direction},
+    layout::{Constraint, Rect},
     style::{Color, Modifier, Style},
     widgets::{Block, Borders, BorderType, Cell, Row, Table},
     Frame,
 };
-use chrono::{Datelike, NaiveDate, Duration};
+use chrono::{Datelike, Duration};
 use crate::app::{App, CalendarState};
 
 pub fn render_calendar(f: &mut Frame, app: &mut App) {

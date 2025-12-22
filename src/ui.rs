@@ -116,7 +116,7 @@ fn render_editor(f: &mut Frame, app: &mut App) {
     }
 }
 
-fn render_preview(f: &mut Frame, app: &mut App) {
+fn render_preview(f: &mut Frame, _app: &mut App) {
     let block = Block::default()
         .title("Report Preview (Coming Soon)")
         .borders(Borders::ALL);
@@ -148,7 +148,7 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
     f.render_widget(title, chunks[0]);
 
     // Tabs
-    let titles: Vec<Line> = vec!["Development", "Internal Review", "External Review"]
+    let titles: Vec<Line> = ["Development", "Internal Review", "External Review"]
         .iter()
         .map(|t| {
             let (first, rest) = t.split_at(1);
@@ -271,7 +271,7 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
          Line::from(vec![
             Span::styled("Status: ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
             Span::raw(&app.status_message),
-             if let Some(_) = app.timer.start_time {
+             if app.timer.start_time.is_some() {
                 Span::styled(" [TIMER RUNNING]", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))
             } else {
                 Span::raw("")

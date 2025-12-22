@@ -7,7 +7,7 @@ use ratatui::{
 };
 use tui_tree_widget::{Tree, TreeItem};
 
-use crate::app::{App, MemoState};
+use crate::app::App;
 use crate::memo::markdown::parse_markdown_to_tree;
 
 pub fn draw_memo_list(app: &mut App, frame: &mut Frame) {

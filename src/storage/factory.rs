@@ -77,7 +77,7 @@ mod tests {
             path = "{}"
         "#, path.display());
         
-        let config = Config::from_str(&toml_str).unwrap();
+        let config = Config::parse(&toml_str).unwrap();
         let storage = create_storage(&config).await.unwrap();
         
         let tasks = storage.load_tasks().await.unwrap();

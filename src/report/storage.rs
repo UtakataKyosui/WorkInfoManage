@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use anyhow::Result;
-use chrono::{NaiveDate, Datelike};
+use chrono::NaiveDate;
 use crate::report::model::DailyReport;
 
 /// Storage trait for daily reports
@@ -22,6 +22,7 @@ pub trait ReportStorage: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Datelike;
     use std::collections::HashMap;
     use std::sync::Arc;
     use tokio::sync::RwLock;

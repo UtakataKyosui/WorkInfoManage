@@ -104,11 +104,11 @@ impl Config {
         let content = std::fs::read_to_string(path.as_ref())
             .with_context(|| format!("Failed to read config file: {}", path.as_ref().display()))?;
 
-        Self::from_str(&content)
+        Self::parse(&content)
     }
 
     /// Parse configuration from TOML string with environment variable expansion
-    pub fn from_str(content: &str) -> Result<Self> {
+    pub fn parse(content: &str) -> Result<Self> {
         // Expand environment variables in the content
         let expanded = Self::expand_env_vars(content)?;
 
@@ -140,7 +140,7 @@ mod tests {
             type = "json"
         "#;
 
-        let config = Config::from_str(toml_str).unwrap();
+        let config = Config::parse(toml_str).unwrap();
         assert!(matches!(config.storage, StorageConfig::Json { .. }));
 
         // Verify path is set to fixed location
@@ -166,7 +166,7 @@ mod tests {
             _ => panic!("Expected Database storage config"),
         }
 
-        let config = Config::from_str(toml_str).unwrap();
+        let config = Config::parse(toml_str).unwrap();
         assert!(matches!(config.storage, StorageConfig::Database { .. }));
     }
 
@@ -184,7 +184,7 @@ mod tests {
             url = "${TEST_DB_URL}"
         "#;
 
-        let config = Config::from_str(toml_str).unwrap();
+        let config = Config::parse(toml_str).unwrap();
         if let StorageConfig::Database { url } = config.storage {
             assert_eq!(url, "postgresql://test:5432/db");
         } else {
@@ -211,7 +211,7 @@ mod tests {
             url = "postgresql://${DB_HOST}:5432/db"
         "#;
 
-        let config = Config::from_str(toml_str).unwrap();
+        let config = Config::parse(toml_str).unwrap();
         if let StorageConfig::Database { url } = config.storage {
             assert_eq!(url, "postgresql://myhost:5432/db");
         } else {
@@ -233,7 +233,7 @@ mod tests {
         "#;
 
         // Should fail because environment variable doesn't exist
-        assert!(Config::from_str(toml_str).is_err());
+        assert!(Config::parse(toml_str).is_err());
     }
 
     #[test]
@@ -243,7 +243,7 @@ mod tests {
             type = "invalid"
         "#;
 
-        assert!(Config::from_str(toml_str).is_err());
+        assert!(Config::parse(toml_str).is_err());
     }
 
     #[test]
@@ -254,6 +254,6 @@ mod tests {
         "#;
 
         // Should fail because 'url' is required for database type
-        assert!(Config::from_str(toml_str).is_err());
+        assert!(Config::parse(toml_str).is_err());
     }
 }

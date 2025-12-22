@@ -42,6 +42,12 @@ pub struct TaskSynchronizer {
     reviewer_config: Option<ReviewerConfig>,
 }
 
+impl Default for TaskSynchronizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskSynchronizer {
     pub fn new() -> Self {
         let reviewer_config = ReviewerConfig::load("reviewers.json").ok();
@@ -228,7 +234,7 @@ impl TaskSynchronizer {
         let check_reviewer = |username: &str| -> ReviewerState {
             let user_review = reviews.iter()
                 .filter(|r| r.get("user").and_then(|u| u.get("login")).and_then(|l| l.as_str()) == Some(username))
-                .last();
+                .next_back();
                 
             let mut status = if requested_reviewers.contains(&username.to_string()) {
                 "Pending".to_string()
@@ -393,12 +399,10 @@ impl TaskSynchronizer {
                         } else {
                             "External Review UnChecked".to_string()
                         }
+                    } else if gh.internal_reviews_finished {
+                        "Internal Review Checked".to_string()
                     } else {
-                        if gh.internal_reviews_finished {
-                            "Internal Review Checked".to_string()
-                        } else {
-                            "Internal Review UnChecked".to_string()
-                        }
+                        "Internal Review UnChecked".to_string()
                     }
                 } else {
                     "Internal Review UnChecked".to_string()

@@ -133,7 +133,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 
-async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, synchronizer: Arc<TaskSynchronizer>, storage: Arc<dyn work_info_manage::storage::Storage>) -> io::Result<()> {
+async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App, synchronizer: Arc<TaskSynchronizer>, storage: Arc<dyn work_info_manage::storage::Storage>) -> io::Result<()> {
     // Pomodoro timer configuration (15 minutes)
     const POMODORO_SECONDS: i64 = 15 * 60;
     
@@ -260,17 +260,13 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                     }
                 } else {
                     // Global Keys
-                     match key.code {
-
-                        KeyCode::Char('t') => {
-                            if app.timer.active_task_id.is_some() {
-                                app.stop_timer().await;
-                            } else {
-                                app.start_timer();
-                            }
-                            // Continue processing - don't exit the app
+                     if let KeyCode::Char('t') = key.code {
+                        if app.timer.active_task_id.is_some() {
+                            app.stop_timer().await;
+                        } else {
+                            app.start_timer();
                         }
-                        _ => {}
+                        // Continue processing - don't exit the app
                     }
                     
                     match app.current_screen {
@@ -388,12 +384,9 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: &mut App, sync
                             }
                         },
                         work_info_manage::app::CurrentScreen::Timer => {
-                             match key.code {
-                                KeyCode::Esc => {
+                             if key.code == KeyCode::Esc {
                                     app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
-                                }
-                                _ => {}
-                            }
+                             }
                         },
                         work_info_manage::app::CurrentScreen::ReviewDetail => {
                             match key.code {
