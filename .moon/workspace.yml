@@ -1,0 +1,25 @@
+# https://moonrepo.dev/docs/config/workspace
+$schema: 'https://moonrepo.dev/schemas/workspace.json'
+
+# Extend from a remote base configuration
+# extends: 'https://raw.githubusercontent.com/moonrepo/moon-configs/master/rust/workspace.yml'
+
+# Project sources
+projects:
+  - '.'
+
+# Version control system
+vcs:
+  manager: 'git'
+  defaultBranch: 'main'
+
+# Runner configuration
+runner:
+  archivableTargets:
+    - 'build'
+  cacheLifetime: '7 days'
+  inheritColorsForPipedTasks: true
+
+# Notification settings
+notifier:
+  webhookUrl: null

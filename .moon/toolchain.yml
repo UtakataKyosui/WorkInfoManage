@@ -1,0 +1,8 @@
+# https://moonrepo.dev/docs/config/toolchain
+$schema: 'https://moonrepo.dev/schemas/toolchain.json'
+
+# Use system Rust - moonrepo will not manage Rust installation
+# Make sure you have Rust installed via rustup with:
+# - rustfmt component
+# - clippy component  
+# - wasm32-unknown-unknown target
