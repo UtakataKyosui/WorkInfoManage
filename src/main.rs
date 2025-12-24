@@ -271,133 +271,54 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App, synchron
                     
                     match app.current_screen {
                         work_info_manage::app::CurrentScreen::Menu => {
-                            match key.code {
-                                KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
-                                KeyCode::Up | KeyCode::Char('k') => {
-                                    if app.menu_selection > 0 {
-                                        app.menu_selection -= 1;
+                            // Convert crossterm KeyEvent to platform-agnostic KeyEvent
+                            let key_event = work_info_manage::input::KeyEvent::from(key);
+                            
+                            // Use shared input handler
+                            work_info_manage::input::InputHandler::handle_menu(&mut *app, key_event);
+                            
+                            // Handle screen-specific initialization after transition
+                            match app.current_screen {
+                                work_info_manage::app::CurrentScreen::Dashboard => {
+                                    if !app.tasks_loaded {
+                                        app.load_tasks().await;
+                                        app.trigger_sync(synchronizer.clone());
+                                        app.tasks_loaded = true;
                                     }
                                 }
-                                KeyCode::Down | KeyCode::Char('j') => {
-                                    if app.menu_selection < 2 {
-                                        app.menu_selection += 1;
-                                    }
+                                work_info_manage::app::CurrentScreen::Calendar => {
+                                    app.calendar_state = Some(work_info_manage::app::CalendarState::new());
                                 }
-                                KeyCode::Enter => {
-                                    match app.menu_selection {
-                                        0 => {
-                                            // Task Manager selected - load tasks from storage immediately
-                                            if !app.tasks_loaded {
-                                                app.load_tasks().await;
-                                                
-                                                // Trigger background sync
-                                                app.trigger_sync(synchronizer.clone());
-                                                
-                                                app.tasks_loaded = true;
-                                            }
-                                            app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
-                                        }
-                                        1 => {
-                                            // Calendar & Daily Reports
-                                            app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
-                                            app.calendar_state = Some(work_info_manage::app::CalendarState::new());
-                                        }
-                                        2 => {
-                                            // All Memos - build unified list
-                                            app.build_unified_memo_list().await;
-                                            app.current_screen = work_info_manage::app::CurrentScreen::UnifiedMemoList;
-                                        }
-                                        _ => {}
-                                    }
+                                work_info_manage::app::CurrentScreen::UnifiedMemoList => {
+                                    app.build_unified_memo_list().await;
                                 }
-                                KeyCode::Char('1') => {
-                                    app.menu_selection = 0;
-                                }
-                                KeyCode::Char('2') => {
-                                    app.menu_selection = 1;
-                                }
-                                KeyCode::Char('3') => {
-                                    app.menu_selection = 2;
-                                }
-                               _ => {}
+                                _ => {}
                             }
                         }
                         work_info_manage::app::CurrentScreen::Dashboard => {
-                            match key.code {
-                                KeyCode::Char('q') => app.should_quit = true,
-                                KeyCode::Esc => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Menu;
-                                }
-                                KeyCode::Char('s') => {
-                                    // Manual Sync trigger
-                                    app.trigger_sync(synchronizer.clone());
-                                }
-                                KeyCode::Down => {
-                                    app.select_next_task();
-                                }
-                                KeyCode::Up => {
-                                    app.select_prev_task();
-                                }
-                                KeyCode::Enter => {
-                                    if !app.get_sorted_visible_indices().is_empty() {
-                                        app.current_screen = work_info_manage::app::CurrentScreen::Detail;
-                                    }
-                                }
-                                KeyCode::Char('T') => { // Shift+t
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Timer;
-                                }
-                                KeyCode::Char('r') => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::ReviewDetail;
-                                }
-                                KeyCode::Tab => {
-                                    app.next_view();
-                                }
-                                KeyCode::Char('1') => {
-                                    app.set_view(work_info_manage::app::CurrentView::Development);
-                                }
-                                KeyCode::Char('2') => {
-                                    app.set_view(work_info_manage::app::CurrentView::InternalReview);
-                                }
-                                KeyCode::Char('3') => {
-                                    app.set_view(work_info_manage::app::CurrentView::ExternalReview);
-                                }
-                                _ => {}
+                            let key_event = work_info_manage::input::KeyEvent::from(key);
+                            
+                            // Handle special sync action before general handling
+                            let is_sync = matches!(key_event.code, work_info_manage::input::KeyCode::Char('s'));
+                            
+                            work_info_manage::input::InputHandler::handle_dashboard(&mut *app, key_event);
+                            
+                            if is_sync {
+                                app.trigger_sync(synchronizer.clone());
                             }
                         },
                         work_info_manage::app::CurrentScreen::Detail => {
-                             match key.code {
-                                KeyCode::Esc => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
-                                }
-                                KeyCode::Char('r') => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::ReviewDetail;
-                                }
-                                KeyCode::Char('n') => {
-                                    // Initialize TextArea for markdown editing
-                                    let mut textarea = tui_textarea::TextArea::default();
-                                    work_info_manage::app::MemoState::configure_textarea(&mut textarea);
-                                    app.task_note_textarea = Some(textarea);
-                                    app.input_mode = true;
-                                    app.status_message = "Enter note (Esc to save, Ctrl+c to cancel)".to_string();
-                                }
-                                _ => {}
-                            }
+                            let key_event = work_info_manage::input::KeyEvent::from(key);
+                            work_info_manage::input::InputHandler::handle_detail(&mut *app, key_event);
                         },
                         work_info_manage::app::CurrentScreen::Timer => {
-                             if key.code == KeyCode::Esc {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
-                             }
+                            if key.code == KeyCode::Esc {
+                                app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
+                            }
                         },
                         work_info_manage::app::CurrentScreen::ReviewDetail => {
-                            match key.code {
-                                KeyCode::Esc | KeyCode::Char('q') => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Dashboard;
-                                }
-                                KeyCode::Enter => {
-                                    app.current_screen = work_info_manage::app::CurrentScreen::Detail;
-                                }
-                                _ => {}
-                            }
+                            let key_event = work_info_manage::input::KeyEvent::from(key);
+                            work_info_manage::input::InputHandler::handle_review_detail(&mut *app, key_event);
                         }
                         work_info_manage::app::CurrentScreen::Calendar => {
                             match key.code {

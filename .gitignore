@@ -7,3 +7,15 @@ logs/
 data/
 config.toml
 mcp_config.json
+dist/
+# Node.js
+node_modules/
+package-lock.json
+
+# Playwright
+playwright-report/
+test-results/
+.playwright/
+
+# moonrepo
+.moon/cache/

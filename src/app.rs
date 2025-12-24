@@ -8,8 +8,30 @@ use std::sync::Arc;
 use chrono::{DateTime, Local, NaiveDate, Datelike};
 use tui_textarea::TextArea;
 use tui_tree_widget::TreeState;
+#[cfg(not(target_arch = "wasm32"))]
 use arboard::Clipboard;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
+pub struct AnimationState {
+    pub app_start_time: Instant,
+    pub last_screen_change: Instant,
+    pub visual_selection: f32, // Floating point index for smooth movement
+    pub visual_velocity: f32,  // Velocity for spring physics
+}
+
+impl Default for AnimationState {
+    fn default() -> Self {
+        Self {
+            app_start_time: Instant::now(),
+            last_screen_change: Instant::now(),
+            visual_selection: 0.0,
+            visual_velocity: 0.0,
+        }
+    }
+}
 pub struct TimerState {
     pub active_task_id: Option<i32>,
     pub start_time: Option<DateTime<Local>>,
@@ -101,6 +123,7 @@ pub struct MemoState {
     pub tree_state: TreeState<String>,
     pub memo_textarea: TextArea<'static>,
     pub editing_memo_path: Option<PathBuf>,
+    #[cfg(not(target_arch = "wasm32"))]
     pub clipboard: Option<Clipboard>,
 }
 
@@ -151,6 +174,7 @@ impl MemoState {
         let mut textarea = TextArea::default();
         Self::configure_textarea(&mut textarea);
 
+        #[cfg(not(target_arch = "wasm32"))]
         let clipboard = Clipboard::new().ok();
 
         Self {
@@ -158,6 +182,7 @@ impl MemoState {
             tree_state,
             memo_textarea: textarea,
             editing_memo_path: None,
+            #[cfg(not(target_arch = "wasm32"))]
             clipboard,
         }
     }
@@ -199,6 +224,7 @@ pub struct App {
     pub timer: TimerState,
     pub input_mode: bool,
     pub input_buffer: String,
+    pub cursor_position: usize,
     pub task_note_textarea: Option<TextArea<'static>>,
     pub current_view: CurrentView,
     pub current_screen: CurrentScreen,
@@ -211,7 +237,8 @@ pub struct App {
     pub menu_selection: usize,
     pub tasks_loaded: bool,
     pub sync_receiver: Option<std::sync::mpsc::Receiver<Result<Vec<crate::db::tasks::Model>, String>>>,
-}
+    pub animation: AnimationState,
+} // App struct end
 
 impl App {
     pub fn new(storage: Arc<dyn Storage>, report_storage: Arc<dyn crate::report::storage::ReportStorage>) -> Self {
@@ -230,6 +257,7 @@ impl App {
             },
             input_mode: false,
             input_buffer: String::new(),
+            cursor_position: 0,
             task_note_textarea: None,
             current_view: CurrentView::Development,
             current_screen: CurrentScreen::Menu,
@@ -247,6 +275,7 @@ impl App {
             menu_selection: 0,
             tasks_loaded: false,
             sync_receiver: None,
+            animation: AnimationState::default(),
         }
     }
 
@@ -256,17 +285,26 @@ impl App {
             return;
         }
 
-        let (tx, rx) = std::sync::mpsc::channel();
-        self.sync_receiver = Some(rx);
-        self.status_message = "Syncing in background...".to_string();
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = synchronizer;
+            self.status_message = "Sync not supported in Web Demo".to_string();
+        }
 
-        std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            let result = rt.block_on(async {
-                synchronizer.sync().await
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let (tx, rx) = std::sync::mpsc::channel();
+            self.sync_receiver = Some(rx);
+            self.status_message = "Syncing in background...".to_string();
+
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                let result = rt.block_on(async {
+                    synchronizer.sync().await
+                });
+                let _ = tx.send(result.map_err(|e| e.to_string()));
             });
-            let _ = tx.send(result.map_err(|e| e.to_string()));
-        });
+        }
     }
 
     pub async fn load_tasks(&mut self) {

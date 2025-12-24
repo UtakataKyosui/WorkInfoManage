@@ -1,15 +1,90 @@
+//! # ストレージシステム
+//!
+//! このモジュールは、タスク、ノート、作業ログの永続化を担当します。
+//!
+//! ## サポートされるストレージバックエンド
+//!
+//! ### JSONファイルストレージ (`json`)
+//! - シンプルで軽量なファイルベースのストレージ
+//! - データベース不要で簡単にセットアップ可能
+//! - 個人利用や開発環境に最適
+//!
+//! ### PostgreSQLデータベース (`database`)
+//! - リレーショナルデータベースによる堅牢なストレージ
+//! - 複数インスタンス間でのデータ共有が可能
+//! - 本番環境や大規模データに適している
+//!
+//! ## 設定方法
+//!
+//! `config.toml`でストレージタイプを指定：
+//!
+//! ```toml
+//! # JSONストレージの例
+//! [storage]
+//! type = "json"
+//! path = "~/task-manage/data.json"
+//!
+//! # データベースストレージの例
+//! [storage]
+//! type = "database"
+//! url = "${DATABASE_URL}"
+//! ```
+//!
+//! ## 自動マイグレーション
+//!
+//! ストレージタイプを変更すると、アプリケーション起動時に自動的にデータが移行されます：
+//!
+//! 1. **データベース → JSON**: すべてのデータがJSONファイルにエクスポート
+//! 2. **JSON → データベース**: JSONファイルのデータがデータベースにインポート
+//!
+//! 移行は初回起動時に一度だけ実行され、元のデータは保持されます。
+//!
+//! ## 使用例
+//!
+//! ```rust,no_run
+//! use work_info_manage::storage::{create_storage, StorageState};
+//! use work_info_manage::config::Config;
+//!
+//! #[tokio::main]
+//! async fn main() -> anyhow::Result<()> {
+//!     // 設定を読み込み
+//!     let config = Config::load()?;
+//!     
+//!     // ストレージを作成（必要に応じてマイグレーション）
+//!     let storage = create_storage(&config.storage).await?;
+//!     
+//!     // タスクを読み込み
+//!     let tasks = storage.load_tasks().await?;
+//!     
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## 詳細情報
+//!
+//! - マイグレーションガイド: `docs/guides/migration.md`
+//! - ストレージ実装の詳細: [`Storage`] トレイト
+
 use async_trait::async_trait;
 use anyhow::Result;
 use crate::db::{tasks, task_notes, work_logs};
 
+#[cfg(not(target_arch = "wasm32"))]
 pub mod json;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod database;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod factory;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod state;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod migration;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub use factory::create_storage;
+#[cfg(not(target_arch = "wasm32"))]
 pub use state::{StorageState, StorageType};
+#[cfg(not(target_arch = "wasm32"))]
 pub use migration::migrate_storage;
 
 /// Storage trait for task persistence

@@ -1,15 +1,21 @@
 use crate::db::tasks;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::api::asana::AsanaClient;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::api::github::GitHubClient;
 use anyhow::Result;
+#[cfg(not(target_arch = "wasm32"))]
 use serde_json::Value;
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::logic::reviewers::ReviewerConfig;
 
 use serde::{Serialize, Deserialize};
+#[cfg(not(target_arch = "wasm32"))]
 use once_cell::sync::Lazy;
 
 // Lazy-compiled regex patterns for performance
+#[cfg(not(target_arch = "wasm32"))]
 static PR_URL_REGEX: Lazy<regex::Regex> = Lazy::new(|| {
     regex::Regex::new(r"https://github\.com/([^/]+)/([^/]+)/pull/(\d+)").unwrap()
 });
@@ -28,6 +34,7 @@ pub struct TaskReviewStatus {
 }
 
 #[derive(Debug, Default)]
+#[cfg(not(target_arch = "wasm32"))]
 pub struct GitHubPrData {
     pub has_internal_reviewer: bool,
     pub internal_reviews_finished: bool,
@@ -37,8 +44,11 @@ pub struct GitHubPrData {
 }
 
 pub struct TaskSynchronizer {
+    #[cfg(not(target_arch = "wasm32"))]
     asana_client: Option<AsanaClient>,
+    #[cfg(not(target_arch = "wasm32"))]
     github_client: Option<GitHubClient>,
+    #[cfg(not(target_arch = "wasm32"))]
     reviewer_config: Option<ReviewerConfig>,
 }
 
@@ -49,6 +59,7 @@ impl Default for TaskSynchronizer {
 }
 
 impl TaskSynchronizer {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new() -> Self {
         let reviewer_config = ReviewerConfig::load("reviewers.json").ok();
 
@@ -67,6 +78,17 @@ impl TaskSynchronizer {
         }
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub async fn sync(&self) -> Result<Vec<tasks::Model>> {
+        Ok(Vec::new())
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn parse_asana_tasks(&self, data: &Value, log: &mut std::fs::File) -> Result<Vec<tasks::Model>> {
         use std::io::Write;
         let mut parsed_tasks = Vec::new();
@@ -93,14 +115,12 @@ impl TaskSynchronizer {
                     .and_then(|v| v.as_str())
                     .unwrap_or("default_task");
                 
-                // Combine task type with description
                 let description = if !notes_str.is_empty() {
                     Some(format!("[Type: {}] {}", task_type, notes_str))
                 } else {
                     Some(format!("[Type: {}]", task_type))
                 };
                 
-                // Parse due date
                 let due_date = task_obj.get("due_on")
                     .and_then(|v| v.as_str())
                     .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
@@ -121,7 +141,6 @@ impl TaskSynchronizer {
                     last_updated_at: chrono::Utc::now().naive_utc(),
                 };
                 
-                // Extract custom field values
                 let mut asana_status = None;
                 let mut task_category = None;
                 
@@ -133,7 +152,6 @@ impl TaskSynchronizer {
                             let display_value = field.get("display_value").and_then(|v| v.as_str()).unwrap_or("N/A");
                             writeln!(log, "[SYNC]   - {}: {}", field_name, display_value).ok();
                             
-                            // Extract specific fields we care about
                             if field_name == "ステータス" && display_value != "N/A" {
                                 asana_status = Some(display_value.to_string());
                             } else if field_name == "タスク種別" && display_value != "N/A" {
@@ -143,14 +161,12 @@ impl TaskSynchronizer {
                     }
                 }
                 
-                // Update task status based on Asana custom field
                 let mut task = task;
                 if let Some(status) = asana_status {
                     writeln!(log, "[SYNC] Using Asana status '{}' for task '{}'", status, task.title).ok();
                     task.status = status;
                 }
                 
-                // Store task category in priority field (temporary until we add a proper field)
                 if let Some(category) = task_category {
                     task.priority = Some(category);
                 }
@@ -162,21 +178,18 @@ impl TaskSynchronizer {
         Ok(parsed_tasks)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     async fn extract_pr_url_from_comments(&self, task_gid: &str) -> Option<String> {
         let Some(asana) = &self.asana_client else {
             return None;
         };
         
-        // Get task stories (comments)
         let stories = asana.get_task_stories(task_gid).await.ok()?;
         let stories_array = stories.get("data")?.as_array()?;
         
-        // Search for comment with "PRを作成しました" and extract PR URL
         for story in stories_array {
             if let Some(text) = story.get("text").and_then(|t| t.as_str()) {
-                // Check if comment contains "PRを作成しました"
                 if text.contains("PRを作成しました") {
-                    // Extract GitHub PR URL from the comment using pre-compiled regex
                     if let Some(caps) = PR_URL_REGEX.captures(text) {
                         return Some(caps.get(0)?.as_str().to_string());
                     }
@@ -187,13 +200,12 @@ impl TaskSynchronizer {
         None
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     async fn process_github_pr(&self, url: &str) -> Result<GitHubPrData> {
         let Some(github) = &self.github_client else {
             anyhow::bail!("GitHub client not available");
         };
         
-        
-        // Parse URL: https://github.com/owner/repo/pull/123 using pre-compiled regex
         let caps = PR_URL_REGEX.captures(url)
             .ok_or_else(|| anyhow::anyhow!("Invalid GitHub PR URL"))?;
         
@@ -201,13 +213,13 @@ impl TaskSynchronizer {
         let repo = caps.get(2).unwrap().as_str();
         let pr_number: u64 = caps.get(3).unwrap().as_str().parse()?;
         
-        // Get PR details
         let pr_data = github.get_pull_request(owner, repo, pr_number).await?;
         let reviews_data = github.get_pr_reviews(owner, repo, pr_number).await?;
         
         self.check_reviewers(&pr_data, &reviews_data).await
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     async fn check_reviewers(&self, pr_data: &Value, reviews_data: &Value) -> Result<GitHubPrData> {
         let config = self.reviewer_config.as_ref()
             .ok_or_else(|| anyhow::anyhow!("Reviewer config not loaded"))?;
@@ -215,7 +227,6 @@ impl TaskSynchronizer {
         let mut data = GitHubPrData::default();
         let mut review_status = TaskReviewStatus::default();
         
-        // Get requested reviewers
         let requested_reviewers: Vec<String> = pr_data
             .get("requested_reviewers")
             .and_then(|v| v.as_array())
@@ -226,11 +237,9 @@ impl TaskSynchronizer {
             })
             .unwrap_or_default();
         
-        // Get reviews
         let reviews = reviews_data.as_array()
             .ok_or_else(|| anyhow::anyhow!("Invalid reviews data"))?;
             
-        // Helper to check individual reviewer status
         let check_reviewer = |username: &str| -> ReviewerState {
             let user_review = reviews.iter()
                 .filter(|r| r.get("user").and_then(|u| u.get("login")).and_then(|l| l.as_str()) == Some(username))
@@ -264,8 +273,6 @@ impl TaskSynchronizer {
             }
         };
         
-        
-        // Check internal reviewers
         let required_internal_reviewers: Vec<_> = config.internal_reviewers.iter()
             .filter(|r| requested_reviewers.contains(r))
             .collect();
@@ -279,11 +286,9 @@ impl TaskSynchronizer {
             }
             review_status.internal.push(state);
         }
-        // All required internal reviewers must approve
         data.internal_reviews_finished = data.has_internal_reviewer 
             && internal_approved_count == required_internal_reviewers.len();
         
-        // Check external reviewers
         let required_external_reviewers: Vec<_> = config.external_reviewers.iter()
             .filter(|r| requested_reviewers.contains(r))
             .collect();
@@ -297,7 +302,6 @@ impl TaskSynchronizer {
             }
             review_status.external.push(state);
         }
-        // All required external reviewers must approve
         data.external_reviews_finished = data.has_external_reviewer 
             && external_approved_count == required_external_reviewers.len();
         
@@ -305,6 +309,7 @@ impl TaskSynchronizer {
         Ok(data)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn infer_status(&self, asana_status: &str, github_data: Option<&GitHubPrData>) -> String {
         match asana_status {
             "Ready" => "Not Started".to_string(),
@@ -332,12 +337,12 @@ impl TaskSynchronizer {
             },
             "Imported" | "Not Started" | "" => "Not Started".to_string(),
             other => {
-                // eprintln!("Warning: Unknown Asana status '{}', using as-is", other);
                 other.to_string()
             }
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn sync(&self) -> Result<Vec<tasks::Model>> {
         use std::io::Write;
         
@@ -353,7 +358,6 @@ impl TaskSynchronizer {
             Ok(file) => file,
             Err(e) => {
                 eprintln!("Warning: Failed to open sync detail log file: {}. Continuing without detailed logging.", e);
-                // Create a dummy writer that discards output
                 std::fs::OpenOptions::new()
                     .write(true)
                     .open("/dev/null")
@@ -414,7 +418,6 @@ impl TaskSynchronizer {
             writeln!(log, "[SYNC] Task '{}': {} (has_pr: {})", task.title, inferred, has_pr).ok();
             task.status = inferred;
             
-            // Save detailed review status
             if let Some(gh) = github_data {
                 if let Some(rs) = gh.review_status {
                     task.review_status = serde_json::to_value(rs).ok();
@@ -425,7 +428,6 @@ impl TaskSynchronizer {
         let all_tasks = tasks;
         writeln!(log, "[SYNC] Total tasks: {}", all_tasks.len()).ok();
 
-        // Note: Task persistence is handled by the caller via the Storage trait
         writeln!(log, "[SYNC] Sync completed successfully").ok();
         Ok(all_tasks)
     }

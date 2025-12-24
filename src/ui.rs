@@ -2,11 +2,18 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap, Table, Row, Cell, Tabs, List, ListItem},
+    widgets::{Block, Borders, Paragraph, Wrap, Table, Row, Cell, Tabs},
     Frame,
 };
 use crate::app::{App, CurrentScreen};
 use crate::db::tasks;
+
+
+use tachyonfx::Interpolation;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Duration;
+#[cfg(target_arch = "wasm32")]
+use web_time::Duration;
 
 use once_cell::sync::Lazy;
 
@@ -28,6 +35,31 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         CurrentScreen::ReportEditor => render_editor(f, app),
         CurrentScreen::ReportPreview => render_preview(f, app),
         CurrentScreen::UnifiedMemoList => render_unified_memo_list(f, app),
+    }
+
+    // Startup Animation: Coalesce (gathering effect)
+    let app_time = app.animation.app_start_time.elapsed();
+    let startup_duration = Duration::from_millis(800); // 0.8 seconds startup
+
+    if app_time < startup_duration {
+        let area = f.area();
+        let buf = f.buffer_mut();
+        // Curtain effect: Sweep In (Left to Right reveal) without moving pixels
+        let mut effect = tachyonfx::fx::sweep_in(tachyonfx::Motion::LeftToRight, 10, 0, Color::Black, (Into::<tachyonfx::Duration>::into(startup_duration), Interpolation::QuadOut));
+        effect.process(app_time.into(), buf, area);
+    } else {
+        // specific screen transition effect (Coalesce to match startup)
+        let elapsed = app.animation.last_screen_change.elapsed();
+        let transition_duration = Duration::from_millis(800);
+        
+        if elapsed < transition_duration {
+            let area = f.area();
+            let buf = f.buffer_mut();
+            
+            // Curtain effect for screen transitions too
+            let mut effect = tachyonfx::fx::sweep_in(tachyonfx::Motion::LeftToRight, 10, 0, Color::Black, (Into::<tachyonfx::Duration>::into(transition_duration), Interpolation::QuadOut));
+            effect.process(elapsed.into(), buf, area);
+        }
     }
 }
 
@@ -54,37 +86,66 @@ fn render_menu(f: &mut Frame, app: &mut App) {
     f.render_widget(title, chunks[0]);
 
     // Menu items using List widget
-    let items = vec![
-        ListItem::new(vec![
-            Line::from(vec![
-                Span::styled("Task Manager", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            ]),
-            Line::from("  Manage tasks with Asana/GitHub sync, Pomodoro timer, work logs, and markdown notes"),
-        ]),
-        ListItem::new(vec![
-            Line::from(vec![
-                Span::styled("Calendar & Daily Reports", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            ]),
-            Line::from("  View calendar and edit daily reports with markdown editor support"),
-        ]),
-        ListItem::new(vec![
-            Line::from(vec![
-                Span::styled("All Memos", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-            ]),
-            Line::from("  Browse all daily reports and task notes in one place"),
-        ]),
+    // Custom Menu Rendering for Smooth Selection
+    // 1. Render Container Block
+    let menu_block = Block::default().borders(Borders::ALL).title("Features");
+    let menu_area = chunks[1];
+    f.render_widget(menu_block, menu_area);
+    
+    // 2. Render Sliding Highlight
+    // Reduce menu_area by 1 for borders
+    let inner_area = menu_area.inner(ratatui::layout::Margin { vertical: 1, horizontal: 1 });
+    
+    let item_height = 2;
+    // Calculate interpolated Y position relative to inner_area
+    // Clamp to ensure it stays within bounds
+    let visual_idx = app.animation.visual_selection.max(0.0).min(2.0); // 3 items (0,1,2)
+    let highlight_y_offset = (visual_idx * item_height as f32).round() as u16;
+    
+    let highlight_rect = ratatui::layout::Rect {
+        x: inner_area.x,
+        y: inner_area.y + highlight_y_offset,
+        width: inner_area.width,
+        height: item_height,
+    };
+    
+    // Render Highlight Background
+    let highlight_block = Block::default().style(Style::default().bg(Color::Blue));
+    f.render_widget(highlight_block, highlight_rect);
+    
+    // 3. Render Items
+    let menu_entries = vec![
+        ("Task Manager", "Manage tasks with Asana/GitHub sync, Pomodoro timer, work logs, and markdown notes"),
+        ("Calendar & Daily Reports", "View calendar and edit daily reports with markdown editor support"),
+        ("All Memos", "Browse all daily reports and task notes in one place"),
     ];
 
-    let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("Features"))
-        .highlight_style(
-            Style::default()
-                .bg(Color::Blue)
-                .add_modifier(Modifier::BOLD)
-        )
-        .highlight_symbol(">> ");
-
-    f.render_stateful_widget(list, chunks[1], &mut ratatui::widgets::ListState::default().with_selected(Some(app.menu_selection)));
+    for (i, (title, desc)) in menu_entries.iter().enumerate() {
+        let y_offset = (i as u16) * item_height;
+        let item_rect = ratatui::layout::Rect {
+            x: inner_area.x,
+            y: inner_area.y + y_offset,
+            width: inner_area.width,
+            height: item_height,
+        };
+        
+        let title_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+        // Highlight active item text as well if needed, but background is already blue.
+        // Let's keep text colors simple.
+        
+        let content = vec![
+            Line::from(vec![
+                if (i as f32 - visual_idx).abs() < 0.5 { Span::raw(">> ") } else { Span::raw("   ") },
+                Span::styled(*title, title_style),
+            ]),
+            Line::from(format!("   {}", desc)),
+        ];
+        
+        let p = Paragraph::new(content);
+        f.render_widget(p, item_rect);
+    }
+    
+    // Legacy list code removed
 
     // Help
     let help = Paragraph::new("↑↓/j/k: Navigate | Enter: Select | q: Quit")
@@ -101,13 +162,35 @@ fn render_editor(f: &mut Frame, app: &mut App) {
             .constraints([Constraint::Min(0), Constraint::Length(3)])
             .split(f.area());
 
-        editor.textarea.set_block(
-            Block::default()
+        // Check if we're in input_mode (WASM uses input_buffer instead of TextArea)
+        if app.input_mode {
+            // Render input buffer for WASM with cursor
+            let block = Block::default()
                 .borders(Borders::ALL)
                 .title(format!("Daily Report - {}", editor.date.format("%Y-%m-%d")))
-                .style(Style::default().fg(Color::Cyan)),
-        );
-        f.render_widget(&editor.textarea, layout[0]);
+                .style(Style::default().fg(Color::Cyan));
+            
+            // Insert cursor character at cursor position
+            let mut display_text = app.input_buffer.clone();
+            if app.cursor_position <= display_text.len() {
+                display_text.insert(app.cursor_position, '█');
+            }
+            
+            let input = Paragraph::new(display_text)
+                .style(Style::default().fg(Color::Yellow))
+                .block(block)
+                .wrap(Wrap { trim: false });
+            f.render_widget(input, layout[0]);
+        } else {
+            // Render TextArea for native
+            editor.textarea.set_block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(format!("Daily Report - {}", editor.date.format("%Y-%m-%d")))
+                    .style(Style::default().fg(Color::Cyan)),
+            );
+            f.render_widget(&editor.textarea, layout[0]);
+        }
 
         let help = Paragraph::new("Esc: Save & Return | Ctrl+s: Save | Ctrl+c: Cancel | Ctrl+v: Paste | Alt+c: Copy | Search highlights headers & bold")
             .block(Block::default().borders(Borders::ALL))
@@ -160,7 +243,7 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
         .collect();
     
     let tabs = Tabs::new(titles)
-        .block(Block::default().borders(Borders::ALL).title("Views (1-3 or Tab)"))
+        .block(Block::default().borders(Borders::ALL).title("Views (1-3, Tab, or Space)"))
         .select(match app.current_view {
             crate::app::CurrentView::Development => 0,
             crate::app::CurrentView::InternalReview => 1,
@@ -265,7 +348,7 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
             Span::raw("Enter: Detail | "),
             Span::raw("T: Timer | "),
             Span::raw("t: Toggle | "),
-            Span::raw("1-3/Tab: View | "),
+            Span::raw("1-3/Tab/Space: View | "),
             Span::styled("Esc/q: Quit", Style::default().fg(Color::Red)),
         ]),
          Line::from(vec![
@@ -484,7 +567,7 @@ fn render_detail(f: &mut Frame, app: &mut App) {
                 .style(Style::default().fg(Color::Gray));
             f.render_widget(help, layout[1]);
         } else {
-            // Fallback to simple input buffer
+            // Fallback to simple input buffer with cursor
             let block = Block::default()
                 .borders(Borders::ALL)
                 .title("Add Memo")
@@ -493,7 +576,13 @@ fn render_detail(f: &mut Frame, app: &mut App) {
             let area = centered_rect(60, 20, f.area());
             f.render_widget(ratatui::widgets::Clear, area); // Clear background
 
-            let input = Paragraph::new(app.input_buffer.as_str())
+            // Insert cursor character at cursor position
+            let mut display_text = app.input_buffer.clone();
+            if app.cursor_position <= display_text.len() {
+                display_text.insert(app.cursor_position, '█');
+            }
+
+            let input = Paragraph::new(display_text)
                 .style(Style::default().fg(Color::Yellow))
                 .block(block);
             f.render_widget(input, area);

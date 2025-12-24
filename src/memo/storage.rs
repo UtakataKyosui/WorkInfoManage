@@ -1,7 +1,9 @@
+#[cfg(not(target_arch = "wasm32"))]
 use color_eyre::eyre::Context;
 use color_eyre::Result;
 use chrono::Local;
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs;
 use std::path::{PathBuf};
 
@@ -41,21 +43,37 @@ impl Memo {
     }
 
     pub fn save(&self) -> Result<()> {
-        if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent).context("Failed to create parent directories")?;
+        #[cfg(target_arch = "wasm32")]
+        return Ok(());
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if let Some(parent) = self.path.parent() {
+                fs::create_dir_all(parent).context("Failed to create parent directories")?;
+            }
+            fs::write(&self.path, &self.content).context("Failed to write memo file")?;
+            Ok(())
         }
-        fs::write(&self.path, &self.content).context("Failed to write memo file")?;
-        Ok(())
     }
 
     pub fn delete(&self) -> Result<()> {
-        if self.path.exists() {
-            fs::remove_file(&self.path).context("Failed to delete memo file")?;
+        #[cfg(target_arch = "wasm32")]
+        return Ok(());
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if self.path.exists() {
+                fs::remove_file(&self.path).context("Failed to delete memo file")?;
+            }
+            Ok(())
         }
-        Ok(())
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn load_memos() -> Result<Vec<Memo>> {
+    Ok(Vec::new())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub fn load_memos() -> Result<Vec<Memo>> {
     let root = get_root_dir();
     if !root.exists() {
@@ -92,11 +110,13 @@ pub fn load_memos() -> Result<Vec<Memo>> {
 }
 
 fn get_root_dir() -> PathBuf {
-    #[cfg(test)]
+    #[cfg(target_arch = "wasm32")]
+    return PathBuf::from("/");
+    #[cfg(all(test, not(target_arch = "wasm32")))]
     {
          std::env::current_dir().unwrap().join("test_tui_memo")
     }
-    #[cfg(not(test))]
+    #[cfg(all(not(test), not(target_arch = "wasm32")))]
     {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
         home.join("tui-memo")
