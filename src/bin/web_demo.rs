@@ -12,6 +12,8 @@ use wasm_bindgen::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsCast;
 #[cfg(target_arch = "wasm32")]
+use web_sys;
+#[cfg(target_arch = "wasm32")]
 use web_time::Instant;
 
 use work_info_manage::app::{App, CurrentScreen};
@@ -23,7 +25,9 @@ use work_info_manage::storage::Storage;
 #[cfg(target_arch = "wasm32")]
 use work_info_manage::ui::ui;
 
+#[cfg(target_arch = "wasm32")]
 struct WebStorage;
+#[cfg(target_arch = "wasm32")]
 #[async_trait]
 impl Storage for WebStorage {
     async fn load_tasks(&self) -> Result<Vec<tasks::Model>> {
@@ -106,7 +110,9 @@ impl Storage for WebStorage {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 struct WebReportStorage;
+#[cfg(target_arch = "wasm32")]
 #[async_trait]
 impl ReportStorage for WebReportStorage {
     async fn save_report(&self, _report: &DailyReport) -> Result<()> {
@@ -151,6 +157,8 @@ impl ReportStorage for WebReportStorage {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(start)]
 fn main() -> std::io::Result<()> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
@@ -272,6 +280,7 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
+#[cfg(target_arch = "wasm32")]
 fn request_animation_frame(f: &Closure<dyn FnMut()>) {
     web_sys::window()
         .expect("no global window")
@@ -279,10 +288,7 @@ fn request_animation_frame(f: &Closure<dyn FnMut()>) {
         .expect("failed to request animation frame");
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        eprintln!("web_demo is only for WASM target. Use 'cargo run' for the native TUI version.");
-    }
-    // WASM entry point is handled by wasm_bindgen
+    eprintln!("web_demo is only for WASM target. Use 'cargo run' for the native TUI version.");
 }
