@@ -19,8 +19,8 @@ impl Storage for MockStorage {
     async fn load_notes(&self, _: i32) -> Result<Vec<task_notes::Model>> { Ok(vec![]) }
     async fn load_all_notes(&self) -> Result<Vec<task_notes::Model>> { Ok(vec![]) }
     async fn save_note(&self, note: &task_notes::Model) -> Result<task_notes::Model> { Ok(note.clone()) }
-    async fn load_work_logs(&self, _: i32) -> Result<Vec<work_logs::Model>> { Ok(vec![]) }
-    async fn save_work_log(&self, log: &work_logs::Model) -> Result<work_logs::Model> { Ok(log.clone()) }
+    async fn load_all_work_logs(&self) -> Result<Vec<work_logs::Model>> { Ok(vec![]) }
+    async fn save_work_log(&self, log: &work_logs::Model) -> Result<()> { Ok(()) }
 }
 
 struct MockReportStorage;

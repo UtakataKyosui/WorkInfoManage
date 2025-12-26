@@ -51,7 +51,7 @@
 //!     let config = Config::load()?;
 //!     
 //!     // ストレージを作成（必要に応じてマイグレーション）
-//!     let storage = create_storage(&config.storage).await?;
+//!     let storage = create_storage(&config).await?;
 //!     
 //!     // タスクを読み込み
 //!     let tasks = storage.load_tasks().await?;

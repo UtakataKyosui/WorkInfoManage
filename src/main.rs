@@ -137,7 +137,16 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App, synchron
     // Pomodoro timer configuration (15 minutes)
     const POMODORO_SECONDS: i64 = 15 * 60;
     
+    let mut last_tick = std::time::Instant::now();
+
     loop {
+        // Calculate delta time for animations
+        let now = std::time::Instant::now();
+        let dt = now.duration_since(last_tick).as_secs_f32();
+        last_tick = now;
+
+        app.tick(dt);
+
         terminal.draw(|f| ui(f, app))?;
         
         // Check for sync results
@@ -409,6 +418,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App, synchron
                                             selected_date,
                                             content
                                         ));
+                                        app.previous_screen = Some(app.current_screen);
                                         app.current_screen = work_info_manage::app::CurrentScreen::ReportEditor;
                                     }
                                 }
@@ -429,7 +439,26 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App, synchron
                                             app.status_message = format!("Failed to save report: {}", e);
                                         } else {
                                             app.status_message = "Report saved.".to_string();
-                                            app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
+                                            
+                                            // Return to previous screen
+                                            let return_screen = app.previous_screen.unwrap_or(work_info_manage::app::CurrentScreen::Calendar);
+                                            
+                                            // Ensure required state exists for the return screen
+                                            match return_screen {
+                                                work_info_manage::app::CurrentScreen::Calendar => {
+                                                    if app.calendar_state.is_none() {
+                                                        app.calendar_state = Some(work_info_manage::app::CalendarState::new());
+                                                    }
+                                                }
+                                                work_info_manage::app::CurrentScreen::UnifiedMemoList => {
+                                                    // Rebuild the memo list when returning
+                                                    app.build_unified_memo_list().await;
+                                                }
+                                                _ => {}
+                                            }
+                                            
+                                            app.current_screen = return_screen;
+                                            app.previous_screen = None;
                                             app.editor_state = None;
                                         }
                                     }
@@ -445,7 +474,24 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App, synchron
                                     }
                                     KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                                         // Cancel without saving
-                                        app.current_screen = work_info_manage::app::CurrentScreen::Calendar;
+                                        let return_screen = app.previous_screen.unwrap_or(work_info_manage::app::CurrentScreen::Calendar);
+                                        
+                                        // Ensure required state exists for the return screen
+                                        match return_screen {
+                                            work_info_manage::app::CurrentScreen::Calendar => {
+                                                if app.calendar_state.is_none() {
+                                                    app.calendar_state = Some(work_info_manage::app::CalendarState::new());
+                                                }
+                                            }
+                                            work_info_manage::app::CurrentScreen::UnifiedMemoList => {
+                                                // Rebuild the memo list when returning
+                                                app.build_unified_memo_list().await;
+                                            }
+                                            _ => {}
+                                        }
+                                        
+                                        app.current_screen = return_screen;
+                                        app.previous_screen = None;
                                         app.editor_state = None;
                                         app.status_message = "Cancelled.".to_string();
                                     }
@@ -519,6 +565,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App, synchron
                                                     };
 
                                                     app.editor_state = Some(work_info_manage::app::EditorState::new(date, content));
+                                                    app.previous_screen = Some(app.current_screen);
                                                     app.current_screen = work_info_manage::app::CurrentScreen::ReportEditor;
                                                 }
                                             } else if last_segment.starts_with("note-") {
@@ -538,6 +585,7 @@ async fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App, synchron
                                                     
                                                     if let Some(idx) = target_task_index {
                                                         app.selected_task_index = idx;
+                                                        app.previous_screen = Some(app.current_screen);
                                                         app.current_screen = work_info_manage::app::CurrentScreen::Detail;
                                                     }
                                                 }

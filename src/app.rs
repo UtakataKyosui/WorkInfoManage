@@ -18,8 +18,8 @@ use web_time::Instant;
 pub struct AnimationState {
     pub app_start_time: Instant,
     pub last_screen_change: Instant,
-    pub visual_selection: f32, // Floating point index for smooth movement
-    pub visual_velocity: f32,  // Velocity for spring physics
+    pub visual_selection: crate::animation::SmoothValue,
+    pub border_progress: f32, // 0.0 to 1.0
 }
 
 impl Default for AnimationState {
@@ -27,8 +27,8 @@ impl Default for AnimationState {
         Self {
             app_start_time: Instant::now(),
             last_screen_change: Instant::now(),
-            visual_selection: 0.0,
-            visual_velocity: 0.0,
+            visual_selection: crate::animation::SmoothValue::new(0.0),
+            border_progress: 0.0,
         }
     }
 }
@@ -228,6 +228,7 @@ pub struct App {
     pub task_note_textarea: Option<TextArea<'static>>,
     pub current_view: CurrentView,
     pub current_screen: CurrentScreen,
+    pub previous_screen: Option<CurrentScreen>, // Track screen before entering editor
     pub sync_state: SyncState,
     pub calendar_state: Option<CalendarState>,
     pub editor_state: Option<EditorState>,
@@ -261,6 +262,7 @@ impl App {
             task_note_textarea: None,
             current_view: CurrentView::Development,
             current_screen: CurrentScreen::Menu,
+            previous_screen: None,
             sync_state: SyncState {
                 last_sync_time: None,
                 total_tasks: 0,
@@ -540,5 +542,20 @@ impl App {
     pub fn set_view(&mut self, view: CurrentView) {
         self.current_view = view;
         self.ensure_selection_visible();
+    }
+
+    pub fn tick(&mut self, dt: f32) {
+        // Continuous border animation
+        self.animation.border_progress += dt * 0.3; // Complete loop every ~3.3 seconds
+        if self.animation.border_progress > 1.0 {
+            self.animation.border_progress -= 1.0;
+        }
+
+        // Handle Menu Animation
+        if self.current_screen == CurrentScreen::Menu {
+            let target = self.menu_selection as f32;
+            self.animation.visual_selection.set_target(target);
+            self.animation.visual_selection.update(dt);
+        }
     }
 }

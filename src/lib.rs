@@ -66,3 +66,4 @@ pub mod report;
 pub mod memo;
 pub mod input;
 pub mod testing;
+pub mod animation;

@@ -260,5 +260,4 @@ fn request_animation_frame(f: &Closure<dyn FnMut()>) {
         .expect("failed to request animation frame");
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn main() {}

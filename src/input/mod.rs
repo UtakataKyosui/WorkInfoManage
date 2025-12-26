@@ -30,9 +30,9 @@
 //!
 //! fn handle_input(app: &mut App, key: KeyEvent) {
 //!     match app.current_screen {
-//!         Screen::Menu => {
+//!         work_info_manage::app::CurrentScreen::Menu => {
 //!             // MenuのInputHandlerを使用
-//!             app.handle_key(key);
+//!             InputHandler::handle_menu(app, key);
 //!         }
 //!         _ => {}
 //!     }

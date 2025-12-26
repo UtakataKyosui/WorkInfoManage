@@ -5,6 +5,7 @@ members = [".", "migration"]
 name = "work-info-manage"
 version = "1.0.0"
 edition = "2021"
+default-run = "work-info-manage"
 
 [dependencies]
 anyhow = "1.0"
