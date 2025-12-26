@@ -65,27 +65,27 @@
 //! - マイグレーションガイド: `docs/guides/migration.md`
 //! - ストレージ実装の詳細: [`Storage`] トレイト
 
-use async_trait::async_trait;
+use crate::db::{task_notes, tasks, work_logs};
 use anyhow::Result;
-use crate::db::{tasks, task_notes, work_logs};
+use async_trait::async_trait;
 
-#[cfg(not(target_arch = "wasm32"))]
-pub mod json;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod database;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod factory;
 #[cfg(not(target_arch = "wasm32"))]
-pub mod state;
+pub mod json;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod migration;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod state;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use factory::create_storage;
 #[cfg(not(target_arch = "wasm32"))]
-pub use state::{StorageState, StorageType};
-#[cfg(not(target_arch = "wasm32"))]
 pub use migration::migrate_storage;
+#[cfg(not(target_arch = "wasm32"))]
+pub use state::{StorageState, StorageType};
 
 /// Storage trait for task persistence
 #[async_trait]

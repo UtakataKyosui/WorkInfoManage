@@ -53,17 +53,17 @@
 
 #![allow(non_snake_case)]
 
-pub mod app;
-pub mod ui;
-pub mod db;
-pub mod logic;
+pub mod animation;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod api;
+pub mod app;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod config;
-pub mod storage;
-pub mod report;
-pub mod memo;
+pub mod db;
 pub mod input;
+pub mod logic;
+pub mod memo;
+pub mod report;
+pub mod storage;
 pub mod testing;
-pub mod animation;
+pub mod ui;

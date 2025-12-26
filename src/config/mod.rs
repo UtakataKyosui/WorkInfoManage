@@ -1,6 +1,6 @@
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use anyhow::{Context, Result};
 
 // Fixed JSON storage path
 const JSON_STORAGE_PATH: &str = "~/task-manage/data.json";
@@ -51,7 +51,9 @@ impl<'de> Deserialize<'de> for StorageConfig {
 
         match Helper::deserialize(deserializer)? {
             Helper::Json { path } => {
-                let path = path.map(PathBuf::from).unwrap_or_else(|| PathBuf::from(JSON_STORAGE_PATH));
+                let path = path
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|| PathBuf::from(JSON_STORAGE_PATH));
                 Ok(StorageConfig::Json { path })
             }
             Helper::Database { url } => Ok(StorageConfig::Database { url }),
@@ -79,8 +81,8 @@ impl StorageConfig {
             }
             StorageConfig::Json { path } => {
                 let path_str = path.to_string_lossy().to_string();
-                let expanded = shellexpand::full(&path_str)
-                    .context("Failed to expand JSON path")?;
+                let expanded =
+                    shellexpand::full(&path_str).context("Failed to expand JSON path")?;
                 *path = PathBuf::from(expanded.as_ref());
             }
         }
@@ -112,8 +114,8 @@ impl Config {
         // Expand environment variables in the content
         let expanded = Self::expand_env_vars(content)?;
 
-        let mut config: Config = toml::from_str(&expanded)
-            .context("Failed to parse TOML configuration")?;
+        let mut config: Config =
+            toml::from_str(&expanded).context("Failed to parse TOML configuration")?;
 
         // Expand paths for all storage types
         config.storage.expand_paths()?;

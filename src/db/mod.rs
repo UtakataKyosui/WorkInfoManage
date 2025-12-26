@@ -2,6 +2,6 @@
 
 pub mod prelude;
 
+pub mod task_notes;
 pub mod tasks;
 pub mod work_logs;
-pub mod task_notes;

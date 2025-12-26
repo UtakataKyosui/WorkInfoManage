@@ -47,8 +47,8 @@
 // Shared input handling logic for all screens
 // This module contains platform-agnostic input handlers
 
-pub mod key_event;
 pub mod handlers;
+pub mod key_event;
 
-pub use key_event::{KeyCode, KeyEvent, KeyModifiers};
 pub use handlers::InputHandler;
+pub use key_event::{KeyCode, KeyEvent, KeyModifiers};

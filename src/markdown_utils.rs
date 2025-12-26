@@ -9,19 +9,19 @@ pub fn handle_markdown_enter(textarea: &mut tui_textarea::TextArea) {
         Continue(String),
         Default,
     }
-    
+
     let action = {
         let lines = textarea.lines();
         if row < lines.len() {
             let current_line = &lines[row];
-            
+
             // Check for bullet points: -, *, +
             let bullet_regex = Regex::new(r"^(\s*)([-*+])\s+(.*)$").unwrap();
             if let Some(caps) = bullet_regex.captures(current_line) {
                 let indent = &caps[1];
                 let marker = &caps[2];
                 let content = &caps[3];
-                
+
                 if content.trim().is_empty() {
                     Action::Clear
                 } else {
@@ -31,15 +31,15 @@ pub fn handle_markdown_enter(textarea: &mut tui_textarea::TextArea) {
                 // Check for numbered lists: 1.
                 let numbered_regex = Regex::new(r"^(\s*)(\d+)\.\s+(.*)$").unwrap();
                 if let Some(caps) = numbered_regex.captures(current_line) {
-                     let indent = &caps[1];
-                     let number: usize = caps[2].parse().unwrap_or(1);
-                     let content = &caps[3];
-                     
-                     if content.trim().is_empty() {
-                         Action::Clear
-                     } else {
-                         Action::Continue(format!("{}{}. ", indent, number + 1))
-                     }
+                    let indent = &caps[1];
+                    let number: usize = caps[2].parse().unwrap_or(1);
+                    let content = &caps[3];
+
+                    if content.trim().is_empty() {
+                        Action::Clear
+                    } else {
+                        Action::Continue(format!("{}{}. ", indent, number + 1))
+                    }
                 } else {
                     Action::Default
                 }
@@ -48,7 +48,7 @@ pub fn handle_markdown_enter(textarea: &mut tui_textarea::TextArea) {
             Action::Default
         }
     };
-    
+
     match action {
         Action::Clear => {
             textarea.delete_line_by_head();

@@ -1,11 +1,11 @@
-use async_trait::async_trait;
+use crate::db::{task_notes, tasks, work_logs};
+use crate::storage::Storage;
 use anyhow::{Context, Result};
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::db::{tasks, task_notes, work_logs};
-use crate::storage::Storage;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct JsonData {
@@ -25,16 +25,17 @@ impl JsonStorage {
 
         // Create parent directory if it doesn't exist
         if let Some(parent) = path.parent() {
-            tokio::fs::create_dir_all(parent).await
+            tokio::fs::create_dir_all(parent)
+                .await
                 .context("Failed to create storage directory")?;
         }
 
         // Load existing data or create new
         let data = if path.exists() {
-            let content = tokio::fs::read_to_string(&path).await
+            let content = tokio::fs::read_to_string(&path)
+                .await
                 .context("Failed to read JSON file")?;
-            serde_json::from_str(&content)
-                .context("Failed to parse JSON file")?
+            serde_json::from_str(&content).context("Failed to parse JSON file")?
         } else {
             JsonData {
                 tasks: vec![],
@@ -52,14 +53,15 @@ impl JsonStorage {
     /// Helper function to persist data to file without acquiring locks
     /// Caller must ensure appropriate locking
     async fn persist(&self, data: &JsonData) -> Result<()> {
-        let json = serde_json::to_string_pretty(data)
-            .context("Failed to serialize data")?;
+        let json = serde_json::to_string_pretty(data).context("Failed to serialize data")?;
 
         // Write atomically using a temp file
         let temp_path = self.path.with_extension("tmp");
-        tokio::fs::write(&temp_path, json).await
+        tokio::fs::write(&temp_path, json)
+            .await
             .context("Failed to write temp file")?;
-        tokio::fs::rename(&temp_path, &self.path).await
+        tokio::fs::rename(&temp_path, &self.path)
+            .await
             .context("Failed to rename temp file")?;
 
         Ok(())
@@ -81,7 +83,9 @@ impl Storage for JsonStorage {
 
     async fn load_notes(&self, task_id: i32) -> Result<Vec<task_notes::Model>> {
         let data = self.data.read().await;
-        Ok(data.notes.iter()
+        Ok(data
+            .notes
+            .iter()
             .filter(|n| n.task_id == task_id)
             .cloned()
             .collect())

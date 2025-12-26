@@ -10,11 +10,7 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Tasks::Table)
-                    .add_column(
-                        ColumnDef::new(Tasks::ReviewStatus)
-                            .json()
-                            .null(),
-                    )
+                    .add_column(ColumnDef::new(Tasks::ReviewStatus).json().null())
                     .to_owned(),
             )
             .await

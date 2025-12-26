@@ -1,12 +1,12 @@
 // Platform-agnostic input handlers for each screen
-use crate::app::{App, CurrentScreen};
 use super::key_event::{KeyCode, KeyEvent};
+use crate::app::{App, CurrentScreen};
 use chrono::Datelike;
 
-#[cfg(target_arch = "wasm32")]
-use web_time::Instant;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 pub struct InputHandler;
 
@@ -185,7 +185,8 @@ impl InputHandler {
                 if let Some(ref state) = app.calendar_state {
                     let selected_date = state.selected_date;
                     app.input_mode = true;
-                    app.editor_state = Some(crate::app::EditorState::new(selected_date, String::new()));
+                    app.editor_state =
+                        Some(crate::app::EditorState::new(selected_date, String::new()));
                     app.current_screen = CurrentScreen::ReportEditor;
                 }
             }

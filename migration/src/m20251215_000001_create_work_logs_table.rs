@@ -19,11 +19,7 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(ColumnDef::new(WorkLogs::TaskId).integer().not_null())
-                    .col(
-                        ColumnDef::new(WorkLogs::StartTime)
-                            .timestamp()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(WorkLogs::StartTime).timestamp().not_null())
                     .col(ColumnDef::new(WorkLogs::EndTime).timestamp())
                     .col(ColumnDef::new(WorkLogs::DurationSeconds).integer())
                     .foreign_key(

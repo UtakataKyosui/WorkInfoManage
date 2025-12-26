@@ -1,17 +1,17 @@
+use crate::memo::{load_memos, Memo};
 use crate::storage::Storage;
-use crate::memo::{Memo, load_memos};
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use chrono::{DateTime, Local, NaiveDate, Datelike};
-use tui_textarea::TextArea;
-use tui_tree_widget::TreeState;
 #[cfg(not(target_arch = "wasm32"))]
 use arboard::Clipboard;
+use chrono::{DateTime, Datelike, Local, NaiveDate};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
+use tui_textarea::TextArea;
+use tui_tree_widget::TreeState;
 #[cfg(target_arch = "wasm32")]
 use web_time::Instant;
 
@@ -129,8 +129,16 @@ pub struct MemoState {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum UnifiedMemoItem {
-    DailyReport { date: NaiveDate, title: String },
-    TaskNote { task_id: i32, task_title: String, note_id: i32, created_at: chrono::NaiveDateTime },
+    DailyReport {
+        date: NaiveDate,
+        title: String,
+    },
+    TaskNote {
+        task_id: i32,
+        task_title: String,
+        note_id: i32,
+        created_at: chrono::NaiveDateTime,
+    },
 }
 
 impl UnifiedMemoItem {
@@ -193,7 +201,7 @@ impl MemoState {
         textarea.set_search_style(
             ratatui::style::Style::default()
                 .fg(ratatui::style::Color::Cyan)
-                .add_modifier(ratatui::style::Modifier::BOLD)
+                .add_modifier(ratatui::style::Modifier::BOLD),
         );
     }
 
@@ -237,12 +245,16 @@ pub struct App {
     pub unified_memo_list_state: Option<UnifiedMemoListState>,
     pub menu_selection: usize,
     pub tasks_loaded: bool,
-    pub sync_receiver: Option<std::sync::mpsc::Receiver<Result<Vec<crate::db::tasks::Model>, String>>>,
+    pub sync_receiver:
+        Option<std::sync::mpsc::Receiver<Result<Vec<crate::db::tasks::Model>, String>>>,
     pub animation: AnimationState,
 } // App struct end
 
 impl App {
-    pub fn new(storage: Arc<dyn Storage>, report_storage: Arc<dyn crate::report::storage::ReportStorage>) -> Self {
+    pub fn new(
+        storage: Arc<dyn Storage>,
+        report_storage: Arc<dyn crate::report::storage::ReportStorage>,
+    ) -> Self {
         Self {
             should_quit: false,
             storage,
@@ -301,9 +313,7 @@ impl App {
 
             std::thread::spawn(move || {
                 let rt = tokio::runtime::Runtime::new().unwrap();
-                let result = rt.block_on(async {
-                    synchronizer.sync().await
-                });
+                let result = rt.block_on(async { synchronizer.sync().await });
                 let _ = tx.send(result.map_err(|e| e.to_string()));
             });
         }
@@ -335,13 +345,15 @@ impl App {
     }
 
     pub async fn stop_timer(&mut self) {
-        if let (Some(start_time), Some(task_id)) = (self.timer.start_time, self.timer.active_task_id) {
+        if let (Some(start_time), Some(task_id)) =
+            (self.timer.start_time, self.timer.active_task_id)
+        {
             let end_time = Local::now();
             let duration = end_time.signed_duration_since(start_time).num_seconds();
-            
+
             use crate::db::work_logs;
             use chrono::Utc;
-            
+
             let work_log = work_logs::Model {
                 id: 0,
                 task_id,
@@ -350,15 +362,16 @@ impl App {
                 duration_seconds: Some(duration as i32),
                 created_at: Utc::now().naive_utc(),
             };
-            
+
             if let Err(e) = self.storage.save_work_log(&work_log).await {
                 eprintln!("Warning: Failed to save work log: {}", e);
-                self.status_message = format!("Timer stopped. Duration: {}s (log save failed)", duration);
+                self.status_message =
+                    format!("Timer stopped. Duration: {}s (log save failed)", duration);
             } else {
                 self.status_message = format!("Timer stopped. Duration: {}s", duration);
             }
         }
-        
+
         self.timer.active_task_id = None;
         self.timer.start_time = None;
         self.timer.cycle_count = 0;
@@ -405,8 +418,12 @@ impl App {
     pub fn get_visible_statuses(&self) -> Vec<&'static str> {
         match self.current_view {
             CurrentView::Development => vec!["Not Started", "In Progress"],
-            CurrentView::InternalReview => vec!["Internal Review UnChecked", "Internal Review Checked"],
-            CurrentView::ExternalReview => vec!["External Review UnChecked", "External Review Checked"],
+            CurrentView::InternalReview => {
+                vec!["Internal Review UnChecked", "Internal Review Checked"]
+            }
+            CurrentView::ExternalReview => {
+                vec!["External Review UnChecked", "External Review Checked"]
+            }
         }
     }
 
@@ -450,23 +467,18 @@ impl App {
         }
 
         // Sort by date (newest first)
-        items.sort_by(|a, b| {
-            b.date().cmp(&a.date())
-        });
-        
+        items.sort_by(|a, b| b.date().cmp(&a.date()));
+
         let mut tree_state = TreeState::default();
         tree_state.open(vec![format!("y-{}", now.year())]);
 
-        self.unified_memo_list_state = Some(UnifiedMemoListState {
-            items,
-            tree_state,
-        });
+        self.unified_memo_list_state = Some(UnifiedMemoListState { items, tree_state });
     }
 
     pub fn get_sorted_visible_indices(&self) -> Vec<usize> {
         let statuses = self.get_visible_statuses();
         let mut indices = Vec::new();
-        
+
         for status in statuses {
             for (i, task) in self.tasks.iter().enumerate() {
                 if task.status == status {
@@ -478,12 +490,19 @@ impl App {
     }
 
     pub fn select_next_task(&mut self) {
-        if self.tasks.is_empty() { return; }
-        
-        let sorted_indices = self.get_sorted_visible_indices();
-        if sorted_indices.is_empty() { return; }
+        if self.tasks.is_empty() {
+            return;
+        }
 
-        if let Some(pos) = sorted_indices.iter().position(|&i| i == self.selected_task_index) {
+        let sorted_indices = self.get_sorted_visible_indices();
+        if sorted_indices.is_empty() {
+            return;
+        }
+
+        if let Some(pos) = sorted_indices
+            .iter()
+            .position(|&i| i == self.selected_task_index)
+        {
             if pos < sorted_indices.len() - 1 {
                 self.selected_task_index = sorted_indices[pos + 1];
             }
@@ -494,30 +513,41 @@ impl App {
     }
 
     pub fn select_prev_task(&mut self) {
-        if self.tasks.is_empty() { return; }
-        
-        let sorted_indices = self.get_sorted_visible_indices();
-        if sorted_indices.is_empty() { return; }
+        if self.tasks.is_empty() {
+            return;
+        }
 
-        if let Some(pos) = sorted_indices.iter().position(|&i| i == self.selected_task_index) {
+        let sorted_indices = self.get_sorted_visible_indices();
+        if sorted_indices.is_empty() {
+            return;
+        }
+
+        if let Some(pos) = sorted_indices
+            .iter()
+            .position(|&i| i == self.selected_task_index)
+        {
             if pos > 0 {
                 self.selected_task_index = sorted_indices[pos - 1];
             }
         } else {
-             // Selected task not visible or invalid, jump to first visible
+            // Selected task not visible or invalid, jump to first visible
             self.selected_task_index = sorted_indices[0];
         }
     }
-    
+
     // Ensure selected task is always visible (e.g. after view switch)
     pub fn ensure_selection_visible(&mut self) {
-        if self.tasks.is_empty() { return; }
-        
-        // If current selection is visible, do nothing
-        if self.selected_task_index < self.tasks.len() && self.is_task_visible(&self.tasks[self.selected_task_index]) {
+        if self.tasks.is_empty() {
             return;
         }
-        
+
+        // If current selection is visible, do nothing
+        if self.selected_task_index < self.tasks.len()
+            && self.is_task_visible(&self.tasks[self.selected_task_index])
+        {
+            return;
+        }
+
         // Otherwise find first visible task
         for (idx, task) in self.tasks.iter().enumerate() {
             if self.is_task_visible(task) {
@@ -525,7 +555,7 @@ impl App {
                 return;
             }
         }
-        
+
         // If no tasks are visible in this view, index doesn't matter much but let's reset to 0
         self.selected_task_index = 0;
     }

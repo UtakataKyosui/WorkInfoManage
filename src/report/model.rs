@@ -42,9 +42,9 @@ mod tests {
     fn test_new_daily_report() {
         let date = NaiveDate::from_ymd_opt(2025, 12, 16).unwrap();
         let content = "# Daily Report\n\nTest content".to_string();
-        
+
         let report = DailyReport::new(date, content.clone());
-        
+
         assert_eq!(report.date, date);
         assert_eq!(report.content, content);
         assert!(report.created_at <= Utc::now());
@@ -55,12 +55,12 @@ mod tests {
     fn test_update_content() {
         let date = NaiveDate::from_ymd_opt(2025, 12, 16).unwrap();
         let mut report = DailyReport::new(date, "Initial content".to_string());
-        
+
         let original_created = report.created_at;
         std::thread::sleep(std::time::Duration::from_millis(10));
-        
+
         report.update_content("Updated content".to_string());
-        
+
         assert_eq!(report.content, "Updated content");
         assert_eq!(report.created_at, original_created);
         assert!(report.updated_at > report.created_at);
