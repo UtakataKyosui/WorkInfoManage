@@ -419,15 +419,17 @@ impl App {
     }
 
     pub fn get_visible_statuses(&self) -> Vec<&'static str> {
-        match self.current_view {
-            CurrentView::Development => vec!["Not Started", "In Progress"],
-            CurrentView::InternalReview => {
-                vec!["Internal Review UnChecked", "Internal Review Checked"]
-            }
-            CurrentView::ExternalReview => {
-                vec!["External Review UnChecked", "External Review Checked"]
-            }
-        }
+        // Return a unified list of all statuses for the single list view
+        vec![
+            "Not Started",
+            "In Progress",
+            "Internal Review",
+            "In Review",
+            "Internal Review UnChecked",
+            "Internal Review Checked",
+            "External Review UnChecked",
+            "External Review Checked",
+        ]
     }
 
     pub fn is_task_visible(&self, task: &crate::db::tasks::Model) -> bool {

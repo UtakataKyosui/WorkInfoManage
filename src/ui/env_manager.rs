@@ -97,10 +97,24 @@ pub fn render_env_manager(f: &mut Frame, app: &mut App) {
     }
 
     // Footer
-    let footer_text = "Esc: Back | ↑↓: Navigate | Enter: Edit | s: Save";
-    let footer = Paragraph::new(footer_text)
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::DarkGray));
+    let mut footer_spans = vec![Span::styled(
+        "Esc: Back | ↑↓: Navigate | Enter: Edit | s: Save",
+        Style::default().fg(Color::DarkGray),
+    )];
+
+    if !app.status_message.is_empty() {
+        footer_spans.push(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
+        let style = if app.status_message.to_lowercase().contains("saved") {
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Yellow)
+        };
+        footer_spans.push(Span::styled(&app.status_message, style));
+    }
+
+    let footer = Paragraph::new(Line::from(footer_spans)).alignment(Alignment::Center);
     f.render_widget(footer, chunks[1]);
 
     // Input overlay removed in favor of inline editing

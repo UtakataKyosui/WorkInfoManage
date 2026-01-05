@@ -341,41 +341,12 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1), // Tabs (Compact)
             Constraint::Min(2),    // Main content (Clean List)
             Constraint::Length(1), // Footer (Controls)
         ])
         .split(inner_area);
 
-    // Tabs
-    let titles: Vec<Line> = ["Development", "Internal Review", "External Review"]
-        .iter()
-        .map(|t| {
-            let (first, rest) = t.split_at(1);
-            Line::from(vec![
-                Span::styled(first, Style::default().fg(Color::Yellow)),
-                Span::styled(rest, Style::default().fg(Color::Green)),
-            ])
-        })
-        .collect();
-
-    let tabs = Tabs::new(titles)
-        // Remove borders from Tabs, just use padding or spacing
-        .block(Block::default().padding(Padding::new(0, 0, 0, 1)))
-        .select(match app.current_view {
-            crate::app::CurrentView::Development => 0,
-            crate::app::CurrentView::InternalReview => 1,
-            crate::app::CurrentView::ExternalReview => 2,
-        })
-        .highlight_style(
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        );
-    f.render_widget(tabs, chunks[0]);
-
-    // Filter tasks based on current view
-    // (Existing logic follows, but render to chunks[1])
+    // Filter tasks based on unified view
     let mut rows = Vec::new();
 
     // Helper closure to create table rows
@@ -389,19 +360,12 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
             .filter(|(_, t)| t.status == status)
             .collect();
 
-        if !tasks.is_empty() {
-            // Section Header
-            local_rows.push(Row::new(vec![
-                Cell::from(""), // Status col filler
-                Cell::from(Span::styled(
-                    format!("--- {} ---", header),
-                    Style::default()
-                        .fg(header_color)
-                        .add_modifier(Modifier::BOLD),
-                )),
-                Cell::from(""), // Due col filler
-            ]));
-        }
+        // Header removed as per user request if not needed, but groupings might be nice?
+        // User said: "Status列があるなら、タイトルの上にある「In Progress」はいらない"
+        // (If there is a Status column, the "In Progress" above the title is not needed).
+        // For a unified list, visual separation might still be good if it's subtle,
+        // but let's stick to the list style.
+        // If we want to group them visually without headers, we can just rely on the sort order.
 
         for (idx, t) in tasks {
             let is_selected = idx == app.selected_task_index;
@@ -436,20 +400,14 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
             let (status_text, bg_color) = match t.status.as_str() {
                 "Not Started" => ("Not Started", Color::DarkGray),
                 "In Progress" => ("In Progress", Color::Blue),
-                "Internal Review Checked" => ("Checked", Color::Cyan), // Shorten only if necessary, but user asked for "app defined ones".
-                // "Internal Review UnChecked" is long. Let's try to fit it or use a smart abbreviation that is still standard-ish
-                // But the user said "Use the ones defined in the app".
-                // Let's use the full string but we allocated Constraint::Min(20) or Percentage.
+                "Internal Review" => ("Internal Review", Color::Magenta),
+                "In Review" => ("In Review", Color::Magenta),
+                "Internal Review Checked" => ("Checked", Color::Cyan),
                 "Internal Review UnChecked" => ("UnChecked", Color::Red),
                 "External Review Checked" => ("Checked", Color::Cyan),
                 "External Review UnChecked" => ("UnChecked", Color::Red),
                 s => (s, Color::Gray),
             };
-
-            // To respect the user's request for "app defined" but also keep it clean:
-            // I will use the raw string if it fits reasonably, or the recognizable suffix for review states if the context is clear from the View.
-            // Actually, in the "Internal Review" tab, having "Internal Review UnChecked" is redundant. "UnChecked" is precise enough.
-            // Let's stick to the mapped short versions above which are cleaner.
 
             let status_badge = Span::styled(
                 format!(" {} ", status_text),
@@ -462,54 +420,46 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
 
             local_rows.push(Row::new(vec![status_cell, title_cell, due_cell]).style(style));
         }
-        if !local_rows.is_empty() {
-            local_rows.push(Row::new(vec![
-                Cell::from(""),
-                Cell::from(""),
-                Cell::from(""),
-            ])); // Spacing row
-        }
         local_rows
     };
 
-    match app.current_view {
-        crate::app::CurrentView::Development => {
-            rows.extend(create_table_rows(
-                "Not Started",
-                "Not Started",
-                Color::Yellow,
-            ));
-            rows.extend(create_table_rows(
-                "In Progress",
-                "In Progress",
-                Color::Green,
-            ));
-        }
-        crate::app::CurrentView::InternalReview => {
-            rows.extend(create_table_rows(
-                "Internal Review UnChecked",
-                "UnChecked",
-                Color::Red,
-            ));
-            rows.extend(create_table_rows(
-                "Internal Review Checked",
-                "Checked",
-                Color::Blue,
-            ));
-        }
-        crate::app::CurrentView::ExternalReview => {
-            rows.extend(create_table_rows(
-                "External Review UnChecked",
-                "UnChecked",
-                Color::Red,
-            ));
-            rows.extend(create_table_rows(
-                "External Review Checked",
-                "Checked",
-                Color::Blue,
-            ));
-        }
-    };
+    // Render all statuses in order
+    rows.extend(create_table_rows(
+        "Not Started",
+        "Not Started",
+        Color::Yellow,
+    ));
+    rows.extend(create_table_rows(
+        "In Progress",
+        "In Progress",
+        Color::Green,
+    ));
+    rows.extend(create_table_rows(
+        "Internal Review",
+        "Internal Review",
+        Color::Magenta,
+    ));
+    rows.extend(create_table_rows("In Review", "In Review", Color::Magenta));
+    rows.extend(create_table_rows(
+        "Internal Review UnChecked",
+        "UnChecked",
+        Color::Red,
+    ));
+    rows.extend(create_table_rows(
+        "Internal Review Checked",
+        "Checked",
+        Color::Blue,
+    ));
+    rows.extend(create_table_rows(
+        "External Review UnChecked",
+        "UnChecked",
+        Color::Red,
+    ));
+    rows.extend(create_table_rows(
+        "External Review Checked",
+        "Checked",
+        Color::Blue,
+    ));
 
     let table = Table::new(
         rows,
@@ -530,7 +480,7 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
     )
     .block(Block::default().padding(Padding::new(1, 1, 0, 0)));
 
-    f.render_widget(table, chunks[1]);
+    f.render_widget(table, chunks[0]);
 
     // Footer lines
     let status = if app.timer.start_time.is_some() {
@@ -546,7 +496,7 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
     let footer = Paragraph::new(footer_text)
         .alignment(Alignment::Center)
         .style(Style::default().fg(Color::DarkGray));
-    f.render_widget(footer, chunks[2]);
+    f.render_widget(footer, chunks[1]);
 }
 
 fn render_detail(f: &mut Frame, app: &mut App) {

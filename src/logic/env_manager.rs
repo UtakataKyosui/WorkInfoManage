@@ -138,6 +138,15 @@ impl EnvManager {
             .map(|v| (v.key.clone(), v.value.clone()))
             .collect()
     }
+
+    /// Loads the decrypted variables into the current process's environment.
+    pub fn load_to_env(&self) {
+        for var in &self.variables {
+            if !var.value.is_empty() {
+                std::env::set_var(&var.key, &var.value);
+            }
+        }
+    }
 }
 
 #[cfg(test)]

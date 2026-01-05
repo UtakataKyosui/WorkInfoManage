@@ -90,7 +90,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
         eprintln!("Warning: Failed to save storage state: {}", e);
     }
 
+    // Initialize Environment Manager and load variables
+    let env_manager = match work_info_manage::logic::env_manager::EnvManager::new() {
+        Ok(manager) => {
+            manager.load_to_env();
+            Some(manager)
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to initialize EnvManager: {}", e);
+            eprintln!("Environment variables from .env.enc will not be loaded.");
+            None
+        }
+    };
+
     // Setup Synchronizer
+    // Note: TaskSynchronizer reads env vars internally, so it must be created AFTER load_to_env()
     let synchronizer = Arc::new(TaskSynchronizer::new());
 
     // Setup terminal
@@ -116,6 +130,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Create app state with storage
     let mut app = App::new(storage.clone(), report_storage);
+    app.env_manager = env_manager;
 
     // Run app loop
     let res = run_app(
