@@ -123,6 +123,27 @@ impl Config {
         Ok(config)
     }
 
+    /// Load raw configuration (without expansion) for editing
+    pub fn load_raw() -> Result<Self> {
+        let content =
+            std::fs::read_to_string("config.toml").with_context(|| "Failed to read config.toml")?;
+        Self::parse_raw(&content)
+    }
+
+    /// Parse raw TOML without variable expansion
+    pub fn parse_raw(content: &str) -> Result<Self> {
+        let config: Config =
+            toml::from_str(content).context("Failed to parse TOML configuration")?;
+        Ok(config)
+    }
+
+    /// Save configuration to file
+    pub fn save(&self) -> Result<()> {
+        let content = toml::to_string_pretty(self).context("Failed to serialize configuration")?;
+        std::fs::write("config.toml", content).context("Failed to write config.toml")?;
+        Ok(())
+    }
+
     /// Expand environment variables in format ${VAR_NAME}
     fn expand_env_vars(content: &str) -> Result<String> {
         shellexpand::full(content)

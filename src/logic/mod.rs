@@ -1,3 +1,4 @@
+pub mod config_manager;
 pub mod env_manager;
 pub mod physics;
 pub mod reviewers;

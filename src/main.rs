@@ -103,6 +103,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
+    // Initialize ConfigManager
+    let config_manager = match work_info_manage::logic::config_manager::ConfigManager::new() {
+        Ok(manager) => Some(manager),
+        Err(e) => {
+            eprintln!("Warning: Failed to initialize ConfigManager: {}", e);
+            None
+        }
+    };
+
     // Setup Synchronizer
     // Note: TaskSynchronizer reads env vars internally, so it must be created AFTER load_to_env()
     let synchronizer = Arc::new(TaskSynchronizer::new());
@@ -131,6 +140,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Create app state with storage
     let mut app = App::new(storage.clone(), report_storage);
     app.env_manager = env_manager;
+    app.config_manager = config_manager;
 
     // Run app loop
     let res = run_app(
@@ -308,6 +318,16 @@ async fn run_app<B: Backend>(
                                     app.input_buffer.clear();
                                     app.status_message =
                                         "Value updated. Press 's' to save.".to_string();
+                                } else if app.current_screen
+                                    == work_info_manage::app::CurrentScreen::ConfigManager
+                                {
+                                    if let Some(ref mut mgr) = app.config_manager {
+                                        mgr.update_database_url(app.input_buffer.clone());
+                                    }
+                                    app.input_mode = false;
+                                    app.input_buffer.clear();
+                                    app.status_message =
+                                        "URL updated. Press 's' to save.".to_string();
                                 } else {
                                     app.save_note().await;
                                 }
@@ -404,6 +424,12 @@ async fn run_app<B: Backend>(
                         work_info_manage::app::CurrentScreen::EnvManager => {
                             let key_event = work_info_manage::input::KeyEvent::from(key);
                             work_info_manage::input::InputHandler::handle_env_manager(
+                                &mut *app, key_event,
+                            );
+                        }
+                        work_info_manage::app::CurrentScreen::ConfigManager => {
+                            let key_event = work_info_manage::input::KeyEvent::from(key);
+                            work_info_manage::input::InputHandler::handle_config_manager(
                                 &mut *app, key_event,
                             );
                         }

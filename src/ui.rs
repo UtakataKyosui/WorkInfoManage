@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Table, Tabs, Wrap},
+    widgets::{Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Table, Wrap},
     Frame,
 };
 use tui_tree_widget::{Tree, TreeItem};
@@ -18,6 +18,7 @@ use web_time::Duration;
 use once_cell::sync::Lazy;
 
 mod calendar;
+pub mod config_manager;
 pub mod env_manager;
 
 // Lazy-compiled regex for link extraction
@@ -37,6 +38,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         CurrentScreen::ReportPreview => render_preview(f, app),
         CurrentScreen::UnifiedMemoList => render_unified_memo_list(f, app),
         CurrentScreen::EnvManager => env_manager::render_env_manager(f, app),
+        CurrentScreen::ConfigManager => config_manager::render(f, app, f.area()),
     }
 
     // Startup Animation: Coalesce (gathering effect)
@@ -128,6 +130,10 @@ fn render_menu(f: &mut Frame, app: &mut App) {
         (
             "Environment Variables",
             "Manage encrypted environment variables securely.",
+        ),
+        (
+            "Configuration",
+            "Manage storage backend and other settings.",
         ),
     ];
 
@@ -350,7 +356,7 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
     let mut rows = Vec::new();
 
     // Helper closure to create table rows
-    let create_table_rows = |status: &str, header: &str, header_color: Color| -> Vec<Row> {
+    let create_table_rows = |status: &str, _header: &str, _header_color: Color| -> Vec<Row> {
         let mut local_rows = Vec::new();
 
         let tasks: Vec<(usize, &tasks::Model)> = app

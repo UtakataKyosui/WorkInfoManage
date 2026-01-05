@@ -57,6 +57,7 @@ pub enum CurrentScreen {
     ReportPreview,
     UnifiedMemoList,
     EnvManager,
+    ConfigManager,
 }
 
 pub struct CalendarState {
@@ -245,6 +246,7 @@ pub struct App {
     pub memo_state: MemoState,
     pub unified_memo_list_state: Option<UnifiedMemoListState>,
     pub env_manager: Option<crate::logic::env_manager::EnvManager>,
+    pub config_manager: Option<crate::logic::config_manager::ConfigManager>,
     pub menu_selection: usize,
     pub tasks_loaded: bool,
     pub sync_receiver:
@@ -289,6 +291,7 @@ impl App {
             memo_state: MemoState::new(),
             unified_memo_list_state: None,
             env_manager: None,
+            config_manager: None,
             menu_selection: 0,
             tasks_loaded: false,
             sync_receiver: None,

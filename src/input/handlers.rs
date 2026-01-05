@@ -15,7 +15,7 @@ impl InputHandler {
     pub fn handle_menu(app: &mut App, key: KeyEvent) {
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
-                if app.menu_selection < 3 {
+                if app.menu_selection < 4 {
                     app.menu_selection += 1;
                 }
             }
@@ -46,6 +46,16 @@ impl InputHandler {
                                 app.env_manager = Some(mgr);
                             } else {
                                 app.status_message = "Failed to load env manager".to_string();
+                            }
+                        }
+                    }
+                    4 => {
+                        app.current_screen = CurrentScreen::ConfigManager;
+                        if app.config_manager.is_none() {
+                            if let Ok(mgr) = crate::logic::config_manager::ConfigManager::new() {
+                                app.config_manager = Some(mgr);
+                            } else {
+                                app.status_message = "Failed to load config manager".to_string();
                             }
                         }
                     }
@@ -206,6 +216,19 @@ impl InputHandler {
 
     /// Handle input mode (text editing)
     pub fn handle_input_mode(app: &mut App, key: KeyEvent) {
+        // Intercept Ctrl+s for Save
+        if key.modifiers.ctrl && key.code == KeyCode::Char('s') {
+            if app.current_screen == CurrentScreen::ConfigManager {
+                if let Some(ref mut mgr) = app.config_manager {
+                    mgr.update_database_url(app.input_buffer.clone());
+                    mgr.save();
+                    app.status_message = mgr.status_message.clone();
+                }
+                // Don't insert 's'
+                return;
+            }
+        }
+
         match key.code {
             KeyCode::Esc => {
                 app.input_mode = false;
@@ -221,6 +244,12 @@ impl InputHandler {
                         }
                     }
                     app.status_message = "Value updated. Press 's' to save to file.".to_string();
+                } else if app.current_screen == CurrentScreen::ConfigManager {
+                    // Save edited URL
+                    if let Some(ref mut mgr) = app.config_manager {
+                        mgr.update_database_url(app.input_buffer.clone());
+                    }
+                    app.status_message = "URL updated. Press 's' to save to file.".to_string();
                 } else {
                     app.task_note_textarea = None;
                     app.status_message = "Note saved (mock).".to_string();
@@ -353,6 +382,46 @@ impl InputHandler {
                         app.status_message = format!("Failed to save: {}", e);
                     } else {
                         app.status_message = "Environment variables saved encrypted.".to_string();
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    /// Handle input for the ConfigManager screen
+    pub fn handle_config_manager(app: &mut App, key: KeyEvent) {
+        if let Some(ref mut mgr) = app.config_manager {
+            // Handle Ctrl+s for save
+            if key.modifiers.ctrl && key.code == KeyCode::Char('s') {
+                mgr.save();
+                app.status_message = mgr.status_message.clone();
+                return;
+            }
+
+            match key.code {
+                KeyCode::Esc | KeyCode::Char('q') => {
+                    app.current_screen = CurrentScreen::Menu;
+                    app.animation.last_screen_change = Instant::now();
+                }
+                KeyCode::Tab => {
+                    if mgr.is_database() {
+                        mgr.set_storage_type_json();
+                    } else {
+                        mgr.set_storage_type_database();
+                    }
+                }
+                KeyCode::Char('1') | KeyCode::Left | KeyCode::Char('h') => {
+                    mgr.set_storage_type_json();
+                }
+                KeyCode::Char('2') | KeyCode::Right | KeyCode::Char('l') => {
+                    mgr.set_storage_type_database();
+                }
+                KeyCode::Enter => {
+                    if mgr.is_database() {
+                        app.input_mode = true;
+                        app.input_buffer = mgr.get_database_url();
+                        app.cursor_position = app.input_buffer.len();
+                        app.status_message = "Editing Database URL".to_string();
                     }
                 }
                 _ => {}
