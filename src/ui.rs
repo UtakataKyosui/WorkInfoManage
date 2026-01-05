@@ -18,6 +18,7 @@ use web_time::Duration;
 use once_cell::sync::Lazy;
 
 mod calendar;
+pub mod env_manager;
 
 // Lazy-compiled regex for link extraction
 static LINK_REGEX: Lazy<regex::Regex> = Lazy::new(|| {
@@ -35,6 +36,7 @@ pub fn ui(f: &mut Frame, app: &mut App) {
         CurrentScreen::ReportEditor => render_editor(f, app),
         CurrentScreen::ReportPreview => render_preview(f, app),
         CurrentScreen::UnifiedMemoList => render_unified_memo_list(f, app),
+        CurrentScreen::EnvManager => env_manager::render_env_manager(f, app),
     }
 
     // Startup Animation: Coalesce (gathering effect)
@@ -109,16 +111,42 @@ fn render_menu(f: &mut Frame, app: &mut App) {
         ])
         .split(menu_area)[1];
 
+    // Render Items
+    let menu_entries = vec![
+        (
+            "Task Manager",
+            "Manage tasks with Asana/GitHub sync, Pomodoro timer, work logs.",
+        ),
+        (
+            "Calendar & Reports",
+            "View calendar and edit daily reports with markdown support.",
+        ),
+        (
+            "All Memos",
+            "Browse all daily reports and task notes in one place.",
+        ),
+        (
+            "Environment Variables",
+            "Manage encrypted environment variables securely.",
+        ),
+    ];
+
     // Dynamic item height based on available screen space
-    // Divide available space by 3 (number of items)
-    // Use max(3) to ensure text fits, but allow it to grow indefinitely to fill screen
-    let item_height = (menu_area.height / 3).max(3) as u16;
+    // Divide available space by number of items
+    let item_count = menu_entries.len();
+    // Allow shrinking to 1 line if space is tight to avoid overlap
+    let item_height = (menu_area.height / item_count as u16).max(1);
 
     // Render Sliding Highlight
-    let visual_idx = app.animation.visual_selection.value().max(0.0).min(2.0); // 3 items
+    let visual_idx = app
+        .animation
+        .visual_selection
+        .value()
+        .max(0.0)
+        .min((item_count - 1) as f32);
 
     // Calculate highlight position
-    let menu_height = item_height * 3;
+    let menu_height = item_height * item_count as u16;
     let menu_top_y = menu_area.y + (menu_area.height.saturating_sub(menu_height) / 2);
 
     let highlight_y_offset = (visual_idx * item_height as f32).round() as u16;
@@ -141,20 +169,7 @@ fn render_menu(f: &mut Frame, app: &mut App) {
     f.render_widget(highlight_block, highlight_rect);
 
     // Render Items
-    let menu_entries = vec![
-        (
-            "Task Manager",
-            "Manage tasks with Asana/GitHub sync, Pomodoro timer, work logs.",
-        ),
-        (
-            "Calendar & Reports",
-            "View calendar and edit daily reports with markdown support.",
-        ),
-        (
-            "All Memos",
-            "Browse all daily reports and task notes in one place.",
-        ),
-    ];
+    // Menu definition moved up
 
     for (i, (title, desc)) in menu_entries.iter().enumerate() {
         let y_offset = (i as u16) * item_height;

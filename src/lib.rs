@@ -64,6 +64,7 @@ pub mod input;
 pub mod logic;
 pub mod memo;
 pub mod report;
+pub mod security;
 pub mod storage;
 pub mod testing;
 pub mod ui;

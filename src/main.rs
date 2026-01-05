@@ -281,12 +281,26 @@ async fn run_app<B: Backend>(
                         // Fallback to simple input buffer
                         match key.code {
                             KeyCode::Enter => {
-                                app.save_note().await;
+                                if app.current_screen
+                                    == work_info_manage::app::CurrentScreen::EnvManager
+                                {
+                                    if let Some(ref mut mgr) = app.env_manager {
+                                        if let Some(var) = mgr.variables.get_mut(mgr.selection) {
+                                            var.value = app.input_buffer.clone();
+                                        }
+                                    }
+                                    app.input_mode = false;
+                                    app.input_buffer.clear();
+                                    app.status_message =
+                                        "Value updated. Press 's' to save.".to_string();
+                                } else {
+                                    app.save_note().await;
+                                }
                             }
                             KeyCode::Esc => {
                                 app.input_mode = false;
                                 app.input_buffer.clear();
-                                app.status_message = "Note cancelled.".to_string();
+                                app.status_message = "Cancelled.".to_string();
                             }
                             KeyCode::Char(c) => {
                                 app.input_buffer.push(c);
@@ -369,6 +383,12 @@ async fn run_app<B: Backend>(
                         work_info_manage::app::CurrentScreen::ReviewDetail => {
                             let key_event = work_info_manage::input::KeyEvent::from(key);
                             work_info_manage::input::InputHandler::handle_review_detail(
+                                &mut *app, key_event,
+                            );
+                        }
+                        work_info_manage::app::CurrentScreen::EnvManager => {
+                            let key_event = work_info_manage::input::KeyEvent::from(key);
+                            work_info_manage::input::InputHandler::handle_env_manager(
                                 &mut *app, key_event,
                             );
                         }

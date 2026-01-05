@@ -15,7 +15,7 @@ impl InputHandler {
     pub fn handle_menu(app: &mut App, key: KeyEvent) {
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
-                if app.menu_selection < 2 {
+                if app.menu_selection < 3 {
                     app.menu_selection += 1;
                 }
             }
@@ -38,6 +38,16 @@ impl InputHandler {
                             items: vec![],
                             tree_state: tui_tree_widget::TreeState::default(),
                         });
+                    }
+                    3 => {
+                        app.current_screen = CurrentScreen::EnvManager;
+                        if app.env_manager.is_none() {
+                            if let Ok(mgr) = crate::logic::env_manager::EnvManager::new() {
+                                app.env_manager = Some(mgr);
+                            } else {
+                                app.status_message = "Failed to load env manager".to_string();
+                            }
+                        }
                     }
                     _ => {}
                 }
@@ -203,6 +213,14 @@ impl InputHandler {
                     app.current_screen = CurrentScreen::Calendar;
                     app.editor_state = None;
                     app.status_message = "Report saved (mock).".to_string();
+                } else if app.current_screen == CurrentScreen::EnvManager {
+                    // Save edited value
+                    if let Some(ref mut mgr) = app.env_manager {
+                        if let Some(var) = mgr.variables.get_mut(mgr.selection) {
+                            var.value = app.input_buffer.clone();
+                        }
+                    }
+                    app.status_message = "Value updated. Press 's' to save to file.".to_string();
                 } else {
                     app.task_note_textarea = None;
                     app.status_message = "Note saved (mock).".to_string();
@@ -300,6 +318,45 @@ impl InputHandler {
                 app.animation.last_screen_change = Instant::now();
             }
             _ => {}
+        }
+    }
+
+    /// Handle input for the EnvManager screen
+    pub fn handle_env_manager(app: &mut App, key: KeyEvent) {
+        if let Some(ref mut mgr) = app.env_manager {
+            match key.code {
+                KeyCode::Esc | KeyCode::Char('q') => {
+                    app.current_screen = CurrentScreen::Menu;
+                    // app.env_manager = None; // Keep state
+                    app.animation.last_screen_change = Instant::now();
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if mgr.selection + 1 < mgr.variables.len() {
+                        mgr.selection += 1;
+                    }
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if mgr.selection > 0 {
+                        mgr.selection -= 1;
+                    }
+                }
+                KeyCode::Enter => {
+                    if let Some(var) = mgr.variables.get(mgr.selection) {
+                        app.input_mode = true;
+                        app.input_buffer = var.value.clone();
+                        app.cursor_position = app.input_buffer.len();
+                        app.status_message = format!("Editing {}", var.key);
+                    }
+                }
+                KeyCode::Char('s') => {
+                    if let Err(e) = mgr.save() {
+                        app.status_message = format!("Failed to save: {}", e);
+                    } else {
+                        app.status_message = "Environment variables saved encrypted.".to_string();
+                    }
+                }
+                _ => {}
+            }
         }
     }
 }
