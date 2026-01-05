@@ -1,14 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch",
-      "Bash(git reset:*)",
-      "WebFetch(domain:docs.rs)",
-      "Bash(◄►: Month)",
-      "Bash(▲▼: Week)",
-      "Bash(⏎: Edit)",
-      "Bash(⇧⇥: Tasks)",
-      "Bash(ESC: Menu\"\n- Removed unused imports (Layout, Constraint, etc.)\n\nThis gives the calendar widget the maximum possible rendering area,\nmaking it much larger and easier to read on the terminal.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(cargo run:*)"
     ],
     "deny": [],
     "ask": []

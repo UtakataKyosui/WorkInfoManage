@@ -1,12 +1,12 @@
 // Platform-agnostic input handlers for each screen
-use crate::app::{App, CurrentScreen};
 use super::key_event::{KeyCode, KeyEvent};
+use crate::app::{App, CurrentScreen};
 use chrono::Datelike;
 
-#[cfg(target_arch = "wasm32")]
-use web_time::Instant;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 pub struct InputHandler;
 
@@ -45,6 +45,9 @@ impl InputHandler {
                     app.animation.last_screen_change = Instant::now();
                 }
             }
+            KeyCode::Char('q') => {
+                app.should_quit = true;
+            }
             _ => {}
         }
     }
@@ -70,6 +73,7 @@ impl InputHandler {
             }
             KeyCode::Enter => {
                 if !app.tasks.is_empty() && app.selected_task_index < app.tasks.len() {
+                    app.previous_screen = None; // Clear previous screen for normal navigation
                     app.current_screen = CurrentScreen::Detail;
                     app.animation.last_screen_change = Instant::now();
                 }
@@ -78,6 +82,9 @@ impl InputHandler {
             KeyCode::Char('2') => app.set_view(crate::app::CurrentView::InternalReview),
             KeyCode::Char('3') => app.set_view(crate::app::CurrentView::ExternalReview),
             KeyCode::Tab | KeyCode::Char(' ') => app.next_view(),
+            KeyCode::Char('q') => {
+                app.should_quit = true;
+            }
             _ => {}
         }
     }
@@ -86,7 +93,10 @@ impl InputHandler {
     pub fn handle_detail(app: &mut App, key: KeyEvent) {
         match key.code {
             KeyCode::Esc => {
-                app.current_screen = CurrentScreen::Dashboard;
+                // Return to previous screen if available, otherwise Dashboard
+                let return_screen = app.previous_screen.unwrap_or(CurrentScreen::Dashboard);
+                app.current_screen = return_screen;
+                app.previous_screen = None;
                 app.animation.last_screen_change = Instant::now();
             }
             KeyCode::Char('n') => {
@@ -175,7 +185,8 @@ impl InputHandler {
                 if let Some(ref state) = app.calendar_state {
                     let selected_date = state.selected_date;
                     app.input_mode = true;
-                    app.editor_state = Some(crate::app::EditorState::new(selected_date, String::new()));
+                    app.editor_state =
+                        Some(crate::app::EditorState::new(selected_date, String::new()));
                     app.current_screen = CurrentScreen::ReportEditor;
                 }
             }

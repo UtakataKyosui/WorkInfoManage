@@ -10,7 +10,9 @@ pub fn create_dummy_tasks() -> Vec<tasks::Model> {
             id: 1,
             asana_id: "DEMO-001".to_string(),
             title: "Setup CI/CD Pipeline".to_string(),
-            description: Some("Configure GitHub Actions for automated testing and deployment".to_string()),
+            description: Some(
+                "Configure GitHub Actions for automated testing and deployment".to_string(),
+            ),
             status: "Not Started".to_string(),
             priority: Some("high".to_string()),
             due_date: Some(Local::now().naive_local() + chrono::Duration::days(3)),
@@ -47,7 +49,9 @@ pub fn create_dummy_tasks() -> Vec<tasks::Model> {
             id: 4,
             asana_id: "DEMO-004".to_string(),
             title: "Add UI Animations".to_string(),
-            description: Some("Implement smooth transitions and effects using tachyonfx".to_string()),
+            description: Some(
+                "Implement smooth transitions and effects using tachyonfx".to_string(),
+            ),
             status: "In Progress".to_string(),
             priority: Some("medium".to_string()),
             due_date: None,
@@ -77,7 +81,9 @@ pub fn create_dummy_tasks() -> Vec<tasks::Model> {
             priority: Some("high".to_string()),
             due_date: Some(Local::now().naive_local()),
             github_pr_url: Some("https://github.com/example/repo/pull/42".to_string()),
-            review_status: Some(serde_json::json!({"status": "pending", "reviewers": ["alice", "bob"]})),
+            review_status: Some(
+                serde_json::json!({"status": "pending", "reviewers": ["alice", "bob"]}),
+            ),
             last_updated_at: Local::now().naive_local() - chrono::Duration::hours(3),
         },
         tasks::Model {
@@ -102,7 +108,9 @@ pub fn create_dummy_tasks() -> Vec<tasks::Model> {
             priority: Some("high".to_string()),
             due_date: Some(Local::now().naive_local() - chrono::Duration::days(1)),
             github_pr_url: Some("https://github.com/example/repo/pull/38".to_string()),
-            review_status: Some(serde_json::json!({"status": "approved", "reviewers": ["alice"], "comments": 2})),
+            review_status: Some(
+                serde_json::json!({"status": "approved", "reviewers": ["alice"], "comments": 2}),
+            ),
             last_updated_at: Local::now().naive_local() - chrono::Duration::days(2),
         },
         // External Review - UnChecked
@@ -115,7 +123,9 @@ pub fn create_dummy_tasks() -> Vec<tasks::Model> {
             priority: Some("high".to_string()),
             due_date: Some(Local::now().naive_local() + chrono::Duration::days(1)),
             github_pr_url: Some("https://github.com/example/repo/pull/61".to_string()),
-            review_status: Some(serde_json::json!({"status": "pending", "external_reviewers": ["partner-team"]})),
+            review_status: Some(
+                serde_json::json!({"status": "pending", "external_reviewers": ["partner-team"]}),
+            ),
             last_updated_at: Local::now().naive_local() - chrono::Duration::hours(12),
         },
         // External Review - Checked
@@ -128,7 +138,9 @@ pub fn create_dummy_tasks() -> Vec<tasks::Model> {
             priority: Some("medium".to_string()),
             due_date: None,
             github_pr_url: Some("https://github.com/example/repo/pull/47".to_string()),
-            review_status: Some(serde_json::json!({"status": "approved", "external_reviewers": ["docs-team"], "comments": 5})),
+            review_status: Some(
+                serde_json::json!({"status": "approved", "external_reviewers": ["docs-team"], "comments": 5}),
+            ),
             last_updated_at: Local::now().naive_local() - chrono::Duration::days(3),
         },
     ]

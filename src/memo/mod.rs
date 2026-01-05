@@ -1,5 +1,5 @@
-pub mod storage;
 pub mod markdown;
+pub mod storage;
 pub mod ui;
 
-pub use storage::{Memo, load_memos};
+pub use storage::{load_memos, Memo};

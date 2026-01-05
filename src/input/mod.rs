@@ -30,9 +30,9 @@
 //!
 //! fn handle_input(app: &mut App, key: KeyEvent) {
 //!     match app.current_screen {
-//!         Screen::Menu => {
+//!         work_info_manage::app::CurrentScreen::Menu => {
 //!             // MenuのInputHandlerを使用
-//!             app.handle_key(key);
+//!             InputHandler::handle_menu(app, key);
 //!         }
 //!         _ => {}
 //!     }
@@ -47,8 +47,8 @@
 // Shared input handling logic for all screens
 // This module contains platform-agnostic input handlers
 
-pub mod key_event;
 pub mod handlers;
+pub mod key_event;
 
-pub use key_event::{KeyCode, KeyEvent, KeyModifiers};
 pub use handlers::InputHandler;
+pub use key_event::{KeyCode, KeyEvent, KeyModifiers};

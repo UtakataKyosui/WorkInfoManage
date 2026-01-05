@@ -1,11 +1,11 @@
+use chrono::Local;
 #[cfg(not(target_arch = "wasm32"))]
 use color_eyre::eyre::Context;
 use color_eyre::Result;
-use chrono::Local;
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::fs;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Memo {
@@ -19,11 +19,11 @@ impl Memo {
     pub fn new(content: String) -> Self {
         let now = Local::now();
         let root = get_root_dir();
-        
+
         // format: tui-memo/YYYY-MM-DD/HH-mm-ss.md
         let date_part = now.format("%Y-%m-%d").to_string();
         let time_part = now.format("%H-%M-%S.md").to_string();
-        
+
         let path = root.join(date_part).join(time_part);
 
         Self {
@@ -91,10 +91,10 @@ pub fn load_memos() -> Result<Vec<Memo>> {
                 let sub_path = sub_entry.path();
                 if sub_path.extension().is_some_and(|ext| ext == "md") {
                     let content = fs::read_to_string(&sub_path)?;
-                    // Use relative path as ID for cleaner tree if needed, 
+                    // Use relative path as ID for cleaner tree if needed,
                     // but absolute path is fine for uniqueness.
-                    // Let's use relative to show nice in tree? 
-                    // No, ID uses strings. 
+                    // Let's use relative to show nice in tree?
+                    // No, ID uses strings.
                     memos.push(Memo {
                         path: sub_path.clone(),
                         content,
@@ -114,7 +114,7 @@ fn get_root_dir() -> PathBuf {
     return PathBuf::from("/");
     #[cfg(all(test, not(target_arch = "wasm32")))]
     {
-         std::env::current_dir().unwrap().join("test_tui_memo")
+        std::env::current_dir().unwrap().join("test_tui_memo")
     }
     #[cfg(all(not(test), not(target_arch = "wasm32")))]
     {

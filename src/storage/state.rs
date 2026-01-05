@@ -1,7 +1,7 @@
+use crate::config::StorageConfig;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use anyhow::Result;
-use crate::config::StorageConfig;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum StorageType {
@@ -31,7 +31,7 @@ impl StorageState {
         if !path.exists() {
             return None;
         }
-        
+
         let content = std::fs::read_to_string(&path).ok()?;
         serde_json::from_str(&content).ok()
     }

@@ -1,20 +1,20 @@
-use async_trait::async_trait;
-use anyhow::Result;
-use chrono::NaiveDate;
 use crate::report::model::DailyReport;
+use anyhow::Result;
+use async_trait::async_trait;
+use chrono::NaiveDate;
 
 /// Storage trait for daily reports
 #[async_trait]
 pub trait ReportStorage: Send + Sync {
     /// Save a daily report
     async fn save_report(&self, report: &DailyReport) -> Result<()>;
-    
+
     /// Load a daily report for a specific date
     async fn load_report(&self, date: NaiveDate) -> Result<Option<DailyReport>>;
-    
+
     /// List all dates that have reports in a given month
     async fn list_report_dates(&self, year: i32, month: u32) -> Result<Vec<NaiveDate>>;
-    
+
     /// Delete a daily report
     async fn delete_report(&self, date: NaiveDate) -> Result<()>;
 }
@@ -87,17 +87,26 @@ mod tests {
     #[tokio::test]
     async fn test_list_report_dates() {
         let storage = MockReportStorage::new();
-        
+
         let date1 = NaiveDate::from_ymd_opt(2025, 12, 15).unwrap();
         let date2 = NaiveDate::from_ymd_opt(2025, 12, 16).unwrap();
         let date3 = NaiveDate::from_ymd_opt(2025, 11, 16).unwrap();
 
-        storage.save_report(&DailyReport::new(date1, "Day 1".to_string())).await.unwrap();
-        storage.save_report(&DailyReport::new(date2, "Day 2".to_string())).await.unwrap();
-        storage.save_report(&DailyReport::new(date3, "Day 3".to_string())).await.unwrap();
+        storage
+            .save_report(&DailyReport::new(date1, "Day 1".to_string()))
+            .await
+            .unwrap();
+        storage
+            .save_report(&DailyReport::new(date2, "Day 2".to_string()))
+            .await
+            .unwrap();
+        storage
+            .save_report(&DailyReport::new(date3, "Day 3".to_string()))
+            .await
+            .unwrap();
 
         let dates = storage.list_report_dates(2025, 12).await.unwrap();
-        
+
         assert_eq!(dates.len(), 2);
         assert_eq!(dates[0], date1);
         assert_eq!(dates[1], date2);
