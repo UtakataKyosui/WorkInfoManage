@@ -3,7 +3,8 @@ use chrono::{Datelike, Duration};
 use ratatui::{
     layout::{Alignment, Constraint, Rect},
     style::{Color, Modifier, Style},
-    widgets::{block::Title, Block, BorderType, Borders, Cell, Row, Table},
+    text::Line,
+    widgets::{Block, BorderType, Borders, Cell, Row, Table},
     Frame,
 };
 
@@ -24,7 +25,7 @@ fn render_calendar_grid(f: &mut Frame, area: Rect, state: &CalendarState, border
     let container_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .title(Title::from(format!(" {} ", title_text)).alignment(Alignment::Center))
+        .title_top(Line::from(format!(" {} ", title_text)).alignment(Alignment::Center))
         .style(Style::default());
 
     f.render_widget(container_block.clone(), area);

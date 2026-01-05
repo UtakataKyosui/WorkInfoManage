@@ -5,7 +5,6 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::block::Title,
     widgets::{Block, BorderType, Borders, Cell, Padding, Paragraph, Row, Table, Tabs, Wrap},
     Frame,
 };
@@ -13,7 +12,6 @@ use tui_tree_widget::{Tree, TreeItem};
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
-use tachyonfx::Interpolation;
 #[cfg(target_arch = "wasm32")]
 use web_time::Duration;
 
@@ -65,7 +63,7 @@ fn render_menu(f: &mut Frame, app: &mut App) {
     let container_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Plain) // Standard single line
-        .title(Title::from(" WorkInfoManage ").alignment(Alignment::Center))
+        .title_top(Line::from(" WorkInfoManage ").alignment(Alignment::Center))
         .style(Style::default());
 
     f.render_widget(container_block.clone(), main_area);
@@ -229,7 +227,7 @@ fn render_editor(f: &mut Frame, app: &mut App) {
         let container_block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Plain)
-            .title(Title::from(title_text).alignment(Alignment::Center))
+            .title_top(Line::from(title_text).alignment(Alignment::Center))
             .style(Style::default());
 
         f.render_widget(container_block.clone(), main_area);
@@ -288,7 +286,7 @@ fn render_preview(f: &mut Frame, app: &mut App) {
     let container_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .title(Title::from(" Report Preview (Coming Soon) ").alignment(Alignment::Center))
+        .title_top(Line::from(" Report Preview (Coming Soon) ").alignment(Alignment::Center))
         .style(Style::default());
 
     f.render_widget(container_block.clone(), main_area);
@@ -315,7 +313,7 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
     let container_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .title(Title::from(" Task Manager ").alignment(Alignment::Center))
+        .title_top(Line::from(" Task Manager ").alignment(Alignment::Center))
         .style(Style::default());
 
     f.render_widget(container_block.clone(), main_area);
@@ -498,12 +496,6 @@ fn render_dashboard(f: &mut Frame, app: &mut App) {
         }
     };
 
-    let title = match app.current_view {
-        crate::app::CurrentView::Development => "Tasks",
-        crate::app::CurrentView::InternalReview => "Tasks",
-        crate::app::CurrentView::ExternalReview => "Tasks",
-    };
-
     let table = Table::new(
         rows,
         [
@@ -548,7 +540,7 @@ fn render_detail(f: &mut Frame, app: &mut App) {
     let container_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .title(Title::from(" Task Detail ").alignment(Alignment::Center))
+        .title_top(Line::from(" Task Detail ").alignment(Alignment::Center))
         .style(Style::default());
 
     f.render_widget(container_block.clone(), main_area);
@@ -800,7 +792,7 @@ fn render_timer(f: &mut Frame, app: &mut App) {
     let container_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .title(Title::from(" Pomodoro Timer ").alignment(Alignment::Center))
+        .title_top(Line::from(" Pomodoro Timer ").alignment(Alignment::Center))
         .style(Style::default());
 
     f.render_widget(container_block.clone(), main_area);
@@ -900,7 +892,7 @@ fn render_review_detail(f: &mut Frame, app: &mut App) {
     let container_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .title(Title::from(" Review Details ").alignment(Alignment::Center))
+        .title_top(Line::from(" Review Details ").alignment(Alignment::Center))
         .style(Style::default());
 
     f.render_widget(container_block.clone(), main_area);
@@ -1034,7 +1026,7 @@ fn render_unified_memo_list(f: &mut Frame, app: &mut App) {
     let container_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
-        .title(Title::from(" Unified Memo List ").alignment(Alignment::Center))
+        .title_top(Line::from(" Unified Memo List ").alignment(Alignment::Center))
         .style(Style::default());
 
     f.render_widget(container_block.clone(), main_area);

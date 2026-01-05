@@ -30,9 +30,10 @@ pub fn perform_manual_reveal(f: &mut Frame, elapsed: Duration, duration: Duratio
     // Hide (clear) everything to the right of the reveal line
     for y in area.top()..area.bottom() {
         for x in reveal_x..area.right() {
-            let cell = buf.get_mut(x, y);
-            cell.set_char(' ');
-            cell.reset(); // Reset style to default (usually terminal background)
+            if let Some(cell) = buf.cell_mut((x, y)) {
+                cell.set_char(' ');
+                cell.reset(); // Reset style to default (usually terminal background)
+            }
         }
     }
 }
@@ -43,7 +44,6 @@ pub struct SmoothValue {
     pub target: f32,
     velocity: f32,
     stiffness: f32,
-    damping: f32,
 }
 
 impl SmoothValue {
@@ -57,7 +57,6 @@ impl SmoothValue {
             // Using a high speed factor for quick response but smooth arrival.
             // This method is unconditionally stable and never oscillates.
             stiffness: 15.0, // Represents "Speed" in this context
-            damping: 0.0,    // Unused in exponential smoothing
         }
     }
 

@@ -1,5 +1,5 @@
 // Physics-based animation for menu selection
-use crate::app::{App, CurrentScreen};
+use crate::app::App;
 
 pub fn update_physics(app: &mut App) {
     // Delegate to the unified tick method which uses SmoothValue
